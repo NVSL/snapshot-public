@@ -1,0 +1,18 @@
+*.o
+.deps/
+.cache/
+.clangd/
+compile_commands.json
+bin/
+lib/
+\#*#
+*.a
+.persp
+.devcontainer/
+.vscode/
+tmp/
+out.*
+perf.*
+*.objdump
+*.rej # Emacs rejected hunks
+.so_deps
