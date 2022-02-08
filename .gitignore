@@ -16,3 +16,4 @@ perf.*
 *.objdump
 *.rej # Emacs rejected hunks
 .so_deps
+*.so

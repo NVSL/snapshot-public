@@ -9,9 +9,12 @@ EXTRA_LINKFLAGS +=-ldsaemu -pthread
 
 include ../common.make
 
-all: dummy
+all: dummy cat-demo
 
 dummy: dummy.o
+	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
+
+cat-demo: cat-demo.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
 clean: clean_deps
