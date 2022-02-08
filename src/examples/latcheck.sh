@@ -24,7 +24,7 @@ run() {
     line0=$(echo "$result" | head -n1)
     line1=$(echo "$result" | tail -n1)
 
-    echo -e "$line0\n$line1"
+    echo -e "$line1"
 }
 
 if [ "${NO_EXECUTE:-0}" -eq 1 ]; then
@@ -35,19 +35,19 @@ if [ ! -e "$TGT_BIN" ]; then
     fatal "$TGT_BIN does not exist."
 fi
 
-echo "no CAT"
+printf "no CAT,"
 reset
 run
 
 
-echo "CAT exclusive 0x00f"
+printf "CAT exclusive 0x00f,"
 reset
 set_associations
 set_mask 0 0x7f0
 set_mask 1 0x00f
 run
 
-echo "CAT exclusive 0x001"
+printf "CAT exclusive 0x001,"
 reset
 set_associations
 set_mask 0 0x7fe
@@ -55,7 +55,7 @@ set_mask 1 0x001
 run
 
 
-echo "CAT shared tiny"
+printf "CAT shared tiny,"
 reset
 set_associations
 set_mask 0 0x001
