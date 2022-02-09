@@ -7,6 +7,8 @@
  */
 
 #include "common.hh"
+#include "libpmbuffer.hh"
+#include "trace.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -26,6 +28,7 @@
 const size_t SCRATCH_SZ = (10*1024*1024)/sizeof(uint64_t);
 
 uint64_t scratch[SCRATCH_SZ];
+uint64_t *reserved_scratch;
 
 constexpr uint64_t SZ_2MB = (uint64_t)(6*1024 * 1024) / sizeof(uint64_t);
 constexpr uint64_t MAX_ITER = 64;
@@ -35,7 +38,8 @@ static unsigned int g_seed;
 
 
 void sa(int signal, siginfo_t *si, void *arg) {
-  std::cout << "Caught segfault" << std::endl;
+  DBGE << "Caught segfault" << std::endl;
+  DBGE << "Stacktrace: \n" << common::get_stack_trace() << std::endl;
   exit(0);
 }
 
@@ -103,12 +107,24 @@ int main(int argc, char* argv[]) {
   std::cout << getpid() << "," << sched_getcpu() << std::endl;
     
   size_t iter = 0;
+  
+  auto pmbuf = pmbuffer::get_pmbuffer();
+  DBGH(0) << "Init reserved scratch" << std::endl;
+  reserved_scratch = (uint64_t*)pmbuf->raw;
+  DBGH(0) << "Got the persistent buffer at " << (void*)reserved_scratch
+          << std::endl;
+  for (size_t i = 0; i < pmbuf->bytes/sizeof(uint64_t); i++) {
+    reserved_scratch[i] = fast_rand()%SZ_2MB;
+  }
+  DBGH(0) << "Init done" << std::endl;
 
+  
   while (iter++ < MAX_ITER) {
     using hrc = std::chrono::high_resolution_clock;
       
     auto start = hrc::now();
     for (uint64_t i = 0; i < SZ_2MB; i++) {
+      auto scratch = reserved_scratch;
       scratch[scratch[scratch[rand()%SZ_2MB]%SZ_2MB]%SZ_2MB] = fast_rand();
     }
     auto end = hrc::now();

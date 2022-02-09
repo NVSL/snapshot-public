@@ -12,4 +12,10 @@
 #include <stdint.h>
 
 namespace pmbuffer {
+  struct pmbuf_t {
+    char *raw;
+    size_t bytes;
+  };
+
+  extern pmbuf_t* get_pmbuffer();
 }

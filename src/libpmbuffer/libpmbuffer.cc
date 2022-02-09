@@ -9,23 +9,42 @@
 #include "libpmbuffer.hh"
 #include "envvars.hh"
 #include "error.hh"
+#include "trace.hh"
 
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
+using namespace pmbuffer;
 
-constexpr size_t PERST_BUF_SZ = 2.5*1024*1024;
+constexpr size_t PERST_BUF_SZ = 6*1024*1024;
 
 static char *perst_buf;
+
+/**
+ * @brief Temporary signal handler to handle any faults during initialization
+ */
+void libpmbuf_tmp_signal_handler(int signal, siginfo_t *si, void *arg) {
+  printf("Unexpected signal %d\n", si->si_signo);
+  printf("Stacktrace:\n%s\n", common::get_stack_trace().c_str());
+  // exit(0);
+  return;
+}
+
+void libpmbuf_tmp_noaction_sighandler(int signal, siginfo_t *si, void *arg) {
+  return;
+}
+
 
 /** 
  * @brief Allocate the persist buffer at the specified path if absent
@@ -33,6 +52,11 @@ static char *perst_buf;
  * @param[in] bytes File size
  */
 void perst_buf_fallocate(fs::path path, size_t bytes) {
+  /* If the file size doesn't match, delete it */
+  if (fs::file_size(path) != bytes) {
+    fs::remove(path);
+  }  
+  
   if (not  fs::is_regular_file(path)) {
     int fd = open(path.c_str(), O_CREAT | O_RDWR, 0644);
     if (fd == -1) PERROR_FATAL("Unable to open persistent buffer backing file");
@@ -44,7 +68,6 @@ void perst_buf_fallocate(fs::path path, size_t bytes) {
     if (1 != write(fd, &buf, 1))
       PERROR_FATAL("Unable to write persistent buffer backing file");
   }
-  
 }
 
 /** @brief Mount the persistent buffer using its path */
@@ -67,6 +90,8 @@ void mount_perst_buf(fs::path perst_buf_fname) {
     fprintf(stderr, "Unable to mmap the PM Buffer at location %s\n.",
             perst_buf_fname.c_str());
   }
+
+  printf("Persistent buffer mounted at address %p\n", perst_buf);
 }
 
 /**
@@ -82,29 +107,70 @@ void reserve_cache(size_t cpuid, size_t ways) {
   system(cmd.c_str());
 }
 
+pmbuf_t *pmbuffer::get_pmbuffer() {
+  auto result = new pmbuf_t;
+  ASSERT(perst_buf != nullptr, "Persistent buffer unitialized.");
+
+  result->bytes = PERST_BUF_SZ;
+  result->raw = perst_buf;
+  
+  return result;
+}
+
 __attribute__((constructor))
 static void libpmbuffer_ctor() {
   fs::path perst_buf_fname = get_env_str(PERST_BUF_LOC_ENV);
 
+  struct sigaction sa, old_sa;
+
+  memset(&sa, 0, sizeof(struct sigaction));
+  memset(&old_sa, 0, sizeof(struct sigaction));
+  
+  sa.sa_sigaction = libpmbuf_tmp_signal_handler;
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+
+  for (int i = SIGRTMIN; i <= SIGRTMAX; i++) {
+    if (sigaction(i, &sa, NULL)) {
+      fprintf(stderr, "Cannot install realtime signal %d handler: %s.\n", i, strerror(errno));
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  sigaction(SIGSEGV, &sa, NULL);
+
+  sa.sa_sigaction = libpmbuf_tmp_noaction_sighandler;
+  sigaction(SIGUSR1, &sa, NULL);
+
   perst_buf_fallocate(perst_buf_fname, PERST_BUF_SZ);
   mount_perst_buf(perst_buf_fname);
 
+  int parent_pid = getpid();
   int pid = fork();
 
   if (pid == 0) {
     /* Use a process to create a cache reservation */
     pid = getpid();
 
+    printf("Binding...\n");
     int cpuid = std::stoul(get_env_str(BIND_CORE_ENV, "0"));
     common::bindcore(cpuid);
 
+    printf("Reserving...\n");
     reserve_cache(cpuid, 0xf);
 
+    printf("memset (pid=%d)...\n", getpid());
     memset(perst_buf, 0, PERST_BUF_SZ);
-    
-    /* We don't have anything else to do, put this process to sleep */
+
+    /* We don't have anything else to do, notify the parent and put this process
+       to sleep */
+    kill(parent_pid, SIGUSR1);
     pause();
   }
-  
+
+  /* Wait for the child to setup the persistent buffer */
+  pause();
+  printf("Completed libpmbuf init\n");
+    
 }
 
