@@ -16,10 +16,6 @@
 
 namespace common {
 
-/* Disable dumps and tracing with puddled */
-/** @brief Dump virtual memory mappings to a file */
-__attribute__((visibility(("default")))) void dump_maps();
-
 /** @brief Return current stack trace from gdb as std::string */
 static inline std::string get_stack_trace() {
 #if defined(RELEASE)

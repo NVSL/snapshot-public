@@ -21,9 +21,16 @@ static inline std::string print_stuff__(std::string msg, std::string dec) {
   return msg;
 }
 
+#define PERROR_FATAL(msg)                       \
+  do {                                          \
+    std::string msg_str(msg);                   \
+    perror(msg_str.c_str());                    \
+    exit(1);                                    \
+  } while (0);
+
 /** @brief Convert errno to exception */
 #define PERROR_EXCEPTION(errcode, msg)                         \
-  ([]() { DBGE << msg << std::endl; }(), common::dump_maps(),  \
+  ([]() { DBGE << msg << std::endl; }(),                       \
    common::print_trace(),                                      \
    std::system_error(errcode, std::generic_category()))
 
@@ -31,7 +38,6 @@ static inline std::string print_stuff__(std::string msg, std::string dec) {
 #define ASSERT_NON_NULL(val, msg)      \
   do {                                 \
     DBGE << msg << std::endl;          \
-    dump_maps();                       \
     print_trace();                     \
     if ((val) == NULL) {               \
       throw std::runtime_error((msg)); \
@@ -51,7 +57,6 @@ static inline std::string print_stuff__(std::string msg, std::string dec) {
   do {                                                   \
     DBGE << msg << std::endl;                            \
     if (not get_env_val(NO_STACKTRACE_ENV)) { \
-      common::dump_maps();                            \
       common::print_trace();                             \
     }                                                    \
     exit(1);                                             \

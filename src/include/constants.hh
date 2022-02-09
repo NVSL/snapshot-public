@@ -11,6 +11,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#define PATH_TO_INTEL_CMT_CAT "/home/smahar/git/intel-cmt-cat"
+
 namespace common {
   /** @brief Enum to help with size of things */
   enum SZ : size_t
@@ -34,7 +36,6 @@ namespace common {
   static constexpr size_t PAGE_SIZE = 4 * SZ::KiB;      // Bytes
   static constexpr size_t HUGE_PAGE_SIZE = 2 * SZ::MiB; // Bytes
   static constexpr size_t CL_SIZE = 64 * SZ::B;         // Bytes
-
 
   enum class pkg_type_t
   {

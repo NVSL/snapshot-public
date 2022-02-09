@@ -16,6 +16,7 @@
 DECL_ENV(PERST_BUF_LOC);
 DECL_ENV(NO_STACKTRACE);
 DECL_ENV(LOG_WILDCARD);
+DECL_ENV(BIND_CORE);
 
 /**
  * @brief Looks up a boolean like env var
@@ -43,9 +44,12 @@ static inline bool get_env_val(const std::string var) {
  * @brief Looks up a string value from env var
  * @details Behavior:
  * 1. Env variable missing -> empty string
+ * @param[in] var Environment variable's name
+ * @param[in] def Default value to return if unset
  */
-static inline std::string get_env_str(const std::string var) {
-  std::string result = "";
+static inline std::string get_env_str(const std::string var, 
+                                      const std::string def = "") {
+  std::string result = def;
 
   const char *val = std::getenv(var.c_str());
   if (val != nullptr) {

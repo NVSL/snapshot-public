@@ -18,7 +18,7 @@ libpmbuffer:
 ../lib/%:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../lib/%, ../src/%, $@))/$(notdir $@) $@
 
-clean: libdsaemu_clean
+clean: libpmbuffer_clean libdsaemu_clean examples_clean
 
 %_clean:
 	$(PUDDLES_MAKE) -C $(subst _clean,,$@) clean

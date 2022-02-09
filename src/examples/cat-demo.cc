@@ -6,6 +6,8 @@
  * @brief  Brief description here
  */
 
+#include "common.hh"
+
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -49,24 +51,6 @@ inline int fast_rand(void) {
   return (g_seed>>16)&0x7FFF;
 }
 
-void bindcore(int cpuid) {
-  cpu_set_t mask;
-  CPU_ZERO(&mask);
-  CPU_SET(cpuid, &mask);
-  int ret = sched_setaffinity(0, sizeof(mask), &mask);
-
-  if (ret != 0) {
-    perror("sched_setaffinity");
-    exit(1);
-  } else {
-    if (sched_getcpu() != cpuid) {
-      std::cerr << "Unable to set CPU affinity" << std::endl;
-      exit(1);
-    }
-  }
-
-}
-
 int main(int argc, char* argv[]) {
   struct sigaction act;
 
@@ -102,7 +86,7 @@ int main(int argc, char* argv[]) {
   while (i < TRASHING_THR_CNT) {
     int pid = fork();
     if (pid == 0) {
-      bindcore(cpuid+i+1);
+      common::bindcore(cpuid+i+1);
       memset(&scratch, (char)rand(), sizeof(scratch));
       while (true) {
         volatile uint64_t result = 0;
@@ -115,7 +99,7 @@ int main(int argc, char* argv[]) {
   }
 
   /* Bind to the requested CPU core */
-  bindcore(cpuid);
+  common::bindcore(cpuid);
   std::cout << getpid() << "," << sched_getcpu() << std::endl;
     
   size_t iter = 0;

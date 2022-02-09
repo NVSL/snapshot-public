@@ -512,6 +512,29 @@ namespace common {
 
     return result;
   }
+
+  /** 
+   * @brief Bind the current process to a core
+   * @param[in] cpuid Zero-indexed processor id 
+   */
+  inline void bindcore(int cpuid) {
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(cpuid, &mask);
+    int ret = sched_setaffinity(0, sizeof(mask), &mask);
+
+    if (ret != 0) {
+      perror("sched_setaffinity");
+      exit(1);
+    } else {
+      if (sched_getcpu() != cpuid) {
+        std::cerr << "Unable to set CPU affinity" << std::endl;
+        exit(1);
+      }
+    }
+
+  }
+
 } // namespace common
   
   
