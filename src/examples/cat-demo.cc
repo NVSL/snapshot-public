@@ -34,31 +34,14 @@ constexpr uint64_t SZ_2MB = (uint64_t)(6*1024 * 1024) / sizeof(uint64_t);
 constexpr uint64_t MAX_ITER = 64;
 constexpr uint64_t WARM_UP_ITER = 16;
 
-static unsigned int g_seed;
-
-
 void sa(int signal, siginfo_t *si, void *arg) {
   DBGE << "Caught segfault" << std::endl;
   DBGE << "Stacktrace: \n" << common::get_stack_trace() << std::endl;
   exit(0);
 }
 
-// Used to seed the generator.           
-inline void fast_srand(int seed) {
-  g_seed = seed;
-}
-
-// Compute a pseudorandom integer.
-// Output value in range [0, 32767]
-inline int fast_rand(void) {
-  g_seed = (214013*g_seed+2531011);
-  return (g_seed>>16)&0x7FFF;
-}
-
 int main(int argc, char* argv[]) {
   struct sigaction act;
-
-  fast_srand(rand());
 
   memset(&act, 0, sizeof(struct sigaction));
   sigemptyset(&act.sa_mask);
@@ -75,7 +58,7 @@ int main(int argc, char* argv[]) {
   int cpuid = atoi(argv[1]);
 
   for (size_t i = 0; i < SCRATCH_SZ; i++) {
-    scratch[i] = fast_rand()%SZ_2MB;
+    scratch[i] = rand()%SZ_2MB;
   }
   
   float
@@ -114,7 +97,7 @@ int main(int argc, char* argv[]) {
   DBGH(0) << "Got the persistent buffer at " << (void*)reserved_scratch
           << std::endl;
   for (size_t i = 0; i < pmbuf->bytes/sizeof(uint64_t); i++) {
-    reserved_scratch[i] = fast_rand()%SZ_2MB;
+    reserved_scratch[i] = rand()%SZ_2MB;
   }
   DBGH(0) << "Init done" << std::endl;
 
@@ -125,7 +108,7 @@ int main(int argc, char* argv[]) {
     auto start = hrc::now();
     for (uint64_t i = 0; i < SZ_2MB; i++) {
       auto scratch = reserved_scratch;
-      scratch[scratch[scratch[rand()%SZ_2MB]%SZ_2MB]%SZ_2MB] = fast_rand();
+      __attribute__((unused)) volatile auto result = scratch[rand()%SZ_2MB];
     }
     auto end = hrc::now();
     

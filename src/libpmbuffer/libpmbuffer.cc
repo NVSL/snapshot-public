@@ -94,6 +94,11 @@ void mount_perst_buf(fs::path perst_buf_fname) {
   printf("Persistent buffer mounted at address %p\n", perst_buf);
 }
 
+/** @brief Resets all configured cache reservations */
+void reset_cache_reservations() {
+  system("pqos -R");
+}
+
 /**
  * @brief Reserve cache for a core
  * @param[in] cpuid zero-indexed CPU id to reserve the cache for
@@ -157,7 +162,12 @@ static void libpmbuffer_ctor() {
     common::bindcore(cpuid);
 
     printf("Reserving...\n");
-    reserve_cache(cpuid, 0xf);
+
+    reset_cache_reservations();
+
+    if (get_env_val(RESERVE_CACHE_ENV)) {
+      reserve_cache(cpuid, 0xf);
+    }
 
     printf("memset (pid=%d)...\n", getpid());
     memset(perst_buf, 0, PERST_BUF_SZ);
@@ -165,6 +175,11 @@ static void libpmbuffer_ctor() {
     /* We don't have anything else to do, notify the parent and put this process
        to sleep */
     kill(parent_pid, SIGUSR1);
+
+    uint64_t i = 0;
+    while (true) {
+      __attribute__((unused)) volatile char result = perst_buf[i++%PERST_BUF_SZ];
+    }
     pause();
   }
 

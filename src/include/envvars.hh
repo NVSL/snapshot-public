@@ -17,6 +17,7 @@ DECL_ENV(PERST_BUF_LOC);
 DECL_ENV(NO_STACKTRACE);
 DECL_ENV(LOG_WILDCARD);
 DECL_ENV(BIND_CORE);
+DECL_ENV(RESERVE_CACHE);
 
 /**
  * @brief Looks up a boolean like env var
