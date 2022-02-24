@@ -9,7 +9,7 @@ EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
 include ../common.make
 
-all: dummy cat-demo
+all: dummy cat-demo periodic-msync
 
 dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
@@ -17,7 +17,10 @@ dummy: dummy.o
 cat-demo: cat-demo.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
+periodic-msync: periodic-msync.o
+	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
+
 clean: clean_deps
-	-rm -rf *.o dummy cat-demo
+	-rm -rf *.o dummy cat-demo periodic-msync
 
 include ../deps.make
