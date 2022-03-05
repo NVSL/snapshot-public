@@ -1,0 +1,70 @@
+
+# Copyright (C) 2019-2020 Terence Kelly.  All rights reserved.
+# Instructions on compiling and running hand-over-hand locking
+# example program.  See USENIX _;login:_ magazine article circa
+# late 2020 for further details on the locking protocol and the
+# example program.
+#
+# The commands in this file should execute under most widely used
+# command interpreters on Unix-like operating systems.  In the
+# C-shell family of shells, for instance, "source README" at the
+# command prompt causes the commands below to execute.
+#
+# Read the comments below (the lines that start with "#").
+
+echo ''
+echo 'compile hand-over-hand locking example program'
+echo ''
+
+# compile twice:  optimization yields more informative error
+# messages; "-g" aids debugging
+rm -f hoh ; gcc -std=c99 -Wall -Wextra -pedantic -O3 -o hoh hoh.c -pthread
+rm -f hoh ; gcc -std=c99 -Wall -Wextra -pedantic -g  -o hoh hoh.c -pthread
+
+# if you merely want to run the program, say "./hoh" at your
+# favorite command prompt
+
+# the next few runs illustrate prudent tests for memory errors
+# and data races; you can also try compiling with gcc's
+# "-fsanitize=thread" flag, which is another race detector
+
+echo '' ; echo '' ; echo ''
+echo 'run with valgrind'
+echo ''
+valgrind -q ./hoh
+
+echo '' ; echo '' ; echo ''
+echo 'run with Helgrind race detector'
+echo ''
+valgrind -q --tool=helgrind --free-is-write=yes ./hoh
+
+echo '' ; echo '' ; echo ''
+echo 'run with DRD race detector'
+echo ''
+valgrind -q --tool=drd --check-stack-var=yes --free-is-write=yes ./hoh
+
+echo '' ; echo '' ; echo ''
+echo 'filter output to see what each thread saw during traversal'
+echo ''
+rm -f thread_output
+./hoh | grep '^T[0-9]:' > thread_output
+echo ''
+echo 'interleaved:'
+echo ''
+cat thread_output
+echo ''
+echo 'filtered:'
+echo ''
+grep "^T0:" < thread_output
+echo ''
+grep "^T1:" < thread_output
+echo ''
+grep "^T2:" < thread_output
+echo ''
+grep "^T3:" < thread_output
+echo ''
+echo ''
+
+# clean up
+rm -f hoh thread_output
+
