@@ -1,0 +1,5 @@
+simplekv_puddles
+*.inst
+*.bc
+.deps/*
+.clang-format
