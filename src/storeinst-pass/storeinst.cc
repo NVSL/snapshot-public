@@ -68,7 +68,7 @@ createRuntimeCheckFunc(Module &m) {
 
           if (StoreInst *si = dyn_cast<StoreInst>(i)) {
             Value *ptr = si->getPointerOperand();
-            errs() << "Instrumenting " << ptr << "\n";
+            // errs() << "Instrumenting " << ptr << "\n";
             LLVMContext &c= si->getContext();
             ptr = new BitCastInst(ptr, Type::getInt8PtrTy(c), ptr->getName(), si);
 

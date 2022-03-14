@@ -4,10 +4,11 @@
 #include <cassert>
 #include <sys/mman.h>
 #include <immintrin.h>
+#include <dlfcn.h>
 
 #define PMEM_START_ADDR_ENV "PMEM_START_ADDR"
 #define PMEM_END_ADDR_ENV "PMEM_END_ADDR"
-#define BUF_SIZE (1000*4096)
+#define BUF_SIZE (10*1000*4096)
 
 static void *start_addr, *end_addr = nullptr;
 char *log_area, *pm_back;
@@ -15,12 +16,20 @@ size_t current_log_off = 0;
 bool startTracking = false;
 bool storeInstEnabled = false;
 
+#define MEMCPY_SIGN (void *(*)(void *, const void *, size_t))
+typedef void* (*memcpy_sign)(void*,const void*,size_t);
+void* (*real_memcpy)(void*,const void*,size_t) = nullptr;
+void* (*real_memmove)(void*,const void*,size_t) = nullptr;
+
 struct log_t {
   uint64_t addr;
   uint64_t val;
 };
 
 __attribute__((constructor)) void libstoreinst_ctor() {
+  real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
+  real_memmove = (memcpy_sign)dlsym(RTLD_NEXT, "memmove");
+  
   const auto start_addr_str = get_env_str(PMEM_START_ADDR_ENV);
   const auto end_addr_str = get_env_str(PMEM_END_ADDR_ENV);
 
@@ -77,10 +86,13 @@ __attribute__((constructor)) void libstoreinst_ctor() {
 
 extern "C" {
   void checkMemory(void* ptr) {
-    storeInstEnabled = true;
+    
     auto log = (log_t*)log_area;
 
     if (start_addr < ptr and ptr < end_addr and startTracking) {
+      storeInstEnabled = true;
+      
+      // printf("checking mem %p\n", ptr);
       log[current_log_off].addr = (uint64_t)ptr;
       log[current_log_off].val = *(uint64_t*)ptr;
 
@@ -110,5 +122,18 @@ extern "C" {
     }
     current_log_off = 0;
     return 0;
+  }
+
+  __attribute__((unused))
+  void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) {
+    // printf("memcpy(%p, %p, %lu)\n", dst, src, n);
+    
+    return real_memcpy(dst, src, n);
+  }
+
+  __attribute__((unused))
+  void *memmove(void *__restrict dst, const void *__restrict src, size_t n) {
+    // printf("memmove(%p, %p, %lu)\n", dst, src, n);
+    return real_memmove(dst, src, n);
   }
 }

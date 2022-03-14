@@ -18,7 +18,7 @@
 
 #include "simplekv_puddles.hh"
 
-constexpr size_t MIN_POOL_SZ = (2 * 1024 * 1024);
+constexpr size_t MIN_POOL_SZ = (20 * 1024 * 1024);
 size_t cur_ator_head = 0;
 
 using kv_type = simple_kv<int, 10000>;
@@ -56,26 +56,32 @@ int main(int argc, char *argv[]) {
 
     auto start_addr_str = get_env_str("PMEM_START_ADDR");
     auto start_addr = (void*)std::stoull(start_addr_str, 0, 16);
-    auto res = mmap(start_addr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE, MAP_SHARED_VALIDATE | MAP_FIXED, fd, 0);
+    auto addr = mmap(start_addr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE,
+                    MAP_SHARED_VALIDATE | MAP_FIXED, fd, 0);
 
-    std::cout << "mounted at " << (void*)res << std::endl;
+    std::cout << "mounted at " << (void*)addr << std::endl;
 
-    if (res == (void*)-1) {
+    if (addr == (void*)-1) {
       perror("mmap failed");
       exit(1);
     }
 
-    auto root = reinterpret_cast<kv_type*>(res);
+    if (addr != start_addr) {
+      fprintf(stderr, "Unable to map at requested location\n");
+      exit(1);
+    }
+
+    auto res = new reservoir_t(addr, MIN_POOL_SZ*10);
+
+    auto root = res->malloc<kv_type>();
 
     std::cout << "Root at " << (void*)root << std::endl;
-
-    root->init(root, MIN_POOL_SZ*10);
+    root->init(res, MIN_POOL_SZ*10);
     if (root == nullptr) {
         msync(root, MIN_POOL_SZ*10, MS_SYNC);
     }
 
     startTracking = true;
-
     if (std::string(argv[2]) == "get" && argc == 4) {
       std::cout << root->get(argv[3]) << std::endl;
     } else if (std::string(argv[2]) == "put" && argc == 5) {
@@ -147,7 +153,7 @@ int main(int argc, char *argv[]) {
           std::flush(std::cout);
         }
         root->put(key, value);
-        snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
+        // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
       }
       std::cout << std::endl;
 
@@ -160,9 +166,14 @@ int main(int argc, char *argv[]) {
         for (size_t i = 0; i < run_size; ++i) {
           if (run_ops[i] == "Update") {
             root->put(run_keys[i], value);
-            snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
+            // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
           } else if (run_ops[i] == "Read") {
+            try {
             result = result + root->get(run_keys[i]);
+            } catch (const std::exception &e) {
+              std::cout << "run = " << run << " i = " << i << std::endl;
+              exit(1);
+            }
           }
         }
       }
