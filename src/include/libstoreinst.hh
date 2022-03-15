@@ -15,4 +15,9 @@ extern "C" {
 
   void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
     __THROW;
+
+  extern bool startTracking;
+  int snapshot(void *addr, size_t length, int flags);
+
+  void libstoreinst_ctor();
 }

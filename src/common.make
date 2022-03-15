@@ -46,3 +46,7 @@ QUIET_INSTALL = @printf '%b %b\n'   $(INSTALLCOLOR)INSTALL$(ENDCOLOR) $(SRCCOLOR
 else
 QUIET_MAKE    = $(MAKE)
 endif
+
+.PHONY: release
+release:
+	$(PUDDLES_MAKE) all RELEASE=1

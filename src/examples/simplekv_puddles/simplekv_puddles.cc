@@ -14,7 +14,8 @@
 #include <fcntl.h>
 
 #include "common.hh"
-#include "libstoreinst.h"
+#include "libstoreinst.hh"
+#include "clock.hh"
 
 #include "simplekv_puddles.hh"
 
@@ -39,6 +40,8 @@ void show_usage(char *argv[]) {
 
 int main(int argc, char *argv[]) {
   std::cout << "---" << std::endl;
+
+  libstoreinst_ctor();
 
   if (argc < 3) {
     show_usage(argv);
@@ -120,7 +123,7 @@ int main(int argc, char *argv[]) {
       std::vector<std::string> load_keys;
       std::vector<std::string> run_ops;
       std::vector<std::string> run_keys;
-      // Clock clk;
+      nvsl::Clock clk;
 
       int value = 4455;
 
@@ -160,7 +163,7 @@ int main(int argc, char *argv[]) {
       /* Execute the run trace */
       std::cout << "Executing run trace" << std::endl;
       size_t run_size = run_ops.size();
-      // clk.tick();
+      clk.tick();
       volatile size_t result = 0;
       for (size_t run = 0; run < 1; run++) {
         for (size_t i = 0; i < run_size; ++i) {
@@ -177,6 +180,9 @@ int main(int argc, char *argv[]) {
           }
         }
       }
+      clk.tock();
+      std::cout << clk.summarize() << std::endl;
+      std::cout << "Done." << std::endl;
     } else {
       show_usage(argv);
       return 1;

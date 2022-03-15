@@ -14,7 +14,7 @@ _LIBS_DIR := $(shell readlink -f $(DIR))
 PUDDLE_CXXFLAGS += -std=c++20
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LDFLAGS +=-L$(_LIBS_DIR) -Wl,-R$(_LIBS_DIR) -Wl,--no-as-needed
-EXTRA_LINKFLAGS +=-luuid -lpthread -lstoreinst -mclwb -ldl
+EXTRA_LINKFLAGS +=-luuid -lpthread -lstoreinst -mclwb -ldl -Wl,--whole-archive libstoreinst.a -Wl,--no-whole-archive
 
 CXX = $(LLVM_DIR)/bin/clang++
 CC = $(LLVM_DIR)/bin/clang
@@ -22,14 +22,14 @@ OPT = $(LLVM_DIR)/bin/opt
 
 include ../../common.make
 
-all: libstoreinst.so
+all: libstoreinst.a
 	$(PUDDLES_MAKE) simplekv_puddles_redir
 
 .PHONY: simplekv_puddles_redir
 simplekv_puddles_redir: simplekv_puddles simplekv_puddles.inst
 
 simplekv_puddles: simplekv_puddles.o
-	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@ $(LINKFLAGS)
+	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
 simplekv_puddles.bc: simplekv_puddles.cc
 	$(PUDDLES_CXX) $(CXXFLAGS) $(INCLUDE) -c -emit-llvm $^ -o $@ 
@@ -42,10 +42,13 @@ simplekv_puddles.opt.bc: simplekv_puddles.bc
 simplekv_puddles.inst: simplekv_puddles.opt.bc
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
-libstoreinst.so: libstoreinst.cc
-	$(PUDDLES_CXX) $(INCLUDE) $(CXXFLAGS) -shared $^ -o $@ -mclwb
+libstoreinst.o: libstoreinst.cc
+	$(PUDDLES_CXX) $(INCLUDE) $(CXXFLAGS) -c $^ -o $@ -mclwb
+
+libstoreinst.a: libstoreinst.o
+	$(PUDDLES_AR) rcs $@ $^
 
 clean: clean_deps
-	-rm -f *.o *.bc *.so *.inst simplekv_puddles
+	-rm -f *.a *.o *.bc *.so *.inst simplekv_puddles
 
 include ../../deps.make

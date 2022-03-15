@@ -31,6 +31,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/BasicBlock.h>
 
+#include <sstream>
 
 using namespace llvm;
 
@@ -57,6 +58,8 @@ createRuntimeCheckFunc(Module &m) {
                                              false);
   return m.getOrInsertFunction("checkMemory", FuncType);
 }
+
+  std::map<std::string, bool> stackValues;
   
   void analysis(Module &m) {
     FunctionCallee checkMemory = createRuntimeCheckFunc(m);
@@ -68,11 +71,22 @@ createRuntimeCheckFunc(Module &m) {
 
           if (StoreInst *si = dyn_cast<StoreInst>(i)) {
             Value *ptr = si->getPointerOperand();
-            // errs() << "Instrumenting " << ptr << "\n";
-            LLVMContext &c= si->getContext();
-            ptr = new BitCastInst(ptr, Type::getInt8PtrTy(c), ptr->getName(), si);
 
-            CallInst::Create(checkMemory, ArrayRef<Value*>(ptr), "", si);
+            std::stringstream ss;
+            ss << ptr;
+            if (not stackValues[ss.str()]) {
+              // errs() << "Instrumenting " << ptr << "\n";
+              LLVMContext &c= si->getContext();
+              ptr = new BitCastInst(ptr, Type::getInt8PtrTy(c), ptr->getName(), si);
+
+              CallInst::Create(checkMemory, ArrayRef<Value*>(ptr), "", si);
+              // errs() << "Instrumenting location " << ptr << "\n";
+            }
+          } else if (AllocaInst *ai = dyn_cast<AllocaInst>(i)) {
+            std::stringstream ss;
+            ss << ai;
+            stackValues[ss.str()] = true;
+            // errs() << "Found an alloca instruction " << ai << "\n";
           }
         }
       }
