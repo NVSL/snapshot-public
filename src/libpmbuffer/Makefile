@@ -5,7 +5,7 @@ OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 LIB_DIR :=../../lib
 LIB_DIR := $(shell readlink -f $(CURDIR)/$(LIB_DIR))
 
-INCLUDE +=-I./
+INCLUDE +=-iquote./
 
 DEPENDS := $(wildcard ../include/* ./*.hh ./*/*.hh)
 
@@ -18,9 +18,7 @@ TARGET := libpmbuffer
 include ../common.make
 
 all:
-	$(PUDDLES_MAKE) library
-
-library: $(TARGET).so
+	$(PUDDLES_MAKE) $(TARGET).so
 
 $(TARGET).so: $(OBJECTS) $(DEPENDS) $(ARCHIVE_DEPENDS)
 	$(PUDDLES_CXX) $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -shared \

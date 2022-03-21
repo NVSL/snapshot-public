@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ratio>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -12,7 +13,9 @@
 #include <immintrin.h>
 
 using hrc = std::chrono::high_resolution_clock;
-constexpr size_t MAP_SIZE = 1024*1024*1024; // 100 MiB
+using namespace std::chrono;
+
+constexpr size_t MAP_SIZE = 10*1024*1024; // 100 MiB
 
 char *buf, *vol_buf, *pm_buf;
 
@@ -88,25 +91,29 @@ int main(int argc, char *argv[]) {
 
   size_t iter = 0;
   auto begin = hrc::now();
-  while (iter++ < 4096) {
+  while (iter++ < 409600) {
     size_t wr_cnt = 0;
     while (wr_cnt++ < update_cnt) {
       buf[rand()%MAP_SIZE] = rand();
     }
+    // auto msync_begin = hrc::now();
     msync(buf, MAP_SIZE, MS_SYNC);
+    // auto msync_elapsed = duration_cast<milliseconds>(hrc::now() - msync_begin);
+    // std::cout << "msync took " << msync_elapsed.count() << " ms"
+              // << std::endl;
   }
   auto msync_time = (hrc::now()-begin).count();
 
-  iter = 0;
-  begin = hrc::now();
-  while (iter++ < 4096) {
-    size_t wr_cnt = 0;
-    while (wr_cnt++ < update_cnt) {
-      vol_buf[rand()%MAP_SIZE] = rand();
-    }
-    us_msync(vol_buf, MAP_SIZE);
-  }
-  auto no_msync_time = (hrc::now()-begin).count();
+  // iter = 0;
+  // begin = hrc::now();
+  // while (iter++ < 4096) {
+  //   size_t wr_cnt = 0;
+  //   while (wr_cnt++ < update_cnt) {
+  //     vol_buf[rand()%MAP_SIZE] = rand();
+  //   }
+  //   us_msync(vol_buf, MAP_SIZE);
+  // }
+  // auto no_msync_time = (hrc::now()-begin).count();
 
   iter = 0;
 
@@ -116,7 +123,7 @@ int main(int argc, char *argv[]) {
   locs.reserve(update_cnt);
 
   begin = hrc::now();
-  while (iter++ < 4096) {
+  while (iter++ < 4096 && false) {
     size_t wr_cnt = 0;
     while (wr_cnt++ < update_cnt) {
       size_t ind = rand()%MAP_SIZE;
@@ -134,8 +141,10 @@ int main(int argc, char *argv[]) {
   auto flush_loc_time = (hrc::now()-begin).count();
 
   // std::cout << "update count,msync,memcpy and flush+sfence" << "\n";
-  std::cout << update_cnt << "," << msync_time << ","
-            << no_msync_time << "," << flush_loc_time << "\n";
+  std::cout << update_cnt << ","
+            << msync_time << ","
+            // << no_msync_time << ","
+            << flush_loc_time << "\n";
 
   // system(("cat /proc/" + std::to_string(getpid()) + "/maps").c_str());
   

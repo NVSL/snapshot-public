@@ -7,9 +7,12 @@
  */
 
 #include "libpmbuffer.hh"
+#include "common.hh"
 #include "envvars.hh"
 #include "error.hh"
-#include "trace.hh"
+#include "nvsl/error.hh"
+#include "nvsl/envvars.hh"
+#include "nvsl/trace.hh"
 
 #include <csignal>
 #include <cstddef>
@@ -36,7 +39,7 @@ static char *perst_buf;
  */
 void libpmbuf_tmp_signal_handler(int signal, siginfo_t *si, void *arg) {
   printf("Unexpected signal %d\n", si->si_signo);
-  printf("Stacktrace:\n%s\n", common::get_stack_trace().c_str());
+  printf("Stacktrace:\n%s\n", nvsl::get_stack_trace().c_str());
   // exit(0);
   return;
 }
@@ -95,7 +98,9 @@ void mount_perst_buf(fs::path perst_buf_fname) {
 }
 
 /** @brief Resets all configured cache reservations */
-void reset_cache_reservations() {
+void reset_cache_reservations(bool verbose = false) {
+  if (verbose)
+    printf("Resetting cache reservation\n");
   system("pqos -R");
 }
 
@@ -105,7 +110,13 @@ void reset_cache_reservations() {
  * @param[in] ways Number of ways to reserve
  * @todo Fix this to use libpqos
  */
-void reserve_cache(size_t cpuid, size_t ways) {
+void reserve_cache(size_t cpuid, size_t ways, bool verbose = false) {
+  if (verbose) {
+    printf("Using core reservations:\n");
+    printf("COS0 -> 0x7f0 and COS1 -> 0x00f");
+    printf("Core 0 -> COS1 and Core (!0) -> COS0");
+  }
+  
   /* COS0 -> 0x7f0 and COS1 -> 0x00f */
   /* Core 0 -> COS1 and Core (!0) -> COS0 */
   std::string cmd = "pqos -e \"llc@0:1=0xf;llc@0:0=0x7f0\" -a \"cos:1=0;cos:0=1-19;\"";
@@ -114,7 +125,7 @@ void reserve_cache(size_t cpuid, size_t ways) {
 
 pmbuf_t *pmbuffer::get_pmbuffer() {
   auto result = new pmbuf_t;
-  ASSERT(perst_buf != nullptr, "Persistent buffer unitialized.");
+  NVSL_ASSERT(perst_buf != nullptr, "Persistent buffer unitialized.");
 
   result->bytes = PERST_BUF_SZ;
   result->raw = perst_buf;
@@ -163,10 +174,10 @@ static void libpmbuffer_ctor() {
 
     printf("Reserving...\n");
 
-    reset_cache_reservations();
+    reset_cache_reservations(true);
 
     if (get_env_val(RESERVE_CACHE_ENV)) {
-      reserve_cache(cpuid, 0xf);
+      reserve_cache(cpuid, 0xf, true);
     }
 
     printf("memset (pid=%d)...\n", getpid());
@@ -179,6 +190,8 @@ static void libpmbuffer_ctor() {
     uint64_t i = 0;
     while (true) {
       __attribute__((unused)) volatile char result = perst_buf[i++%PERST_BUF_SZ];
+      if (i%PERST_BUF_SZ == 0)
+      usleep(10000);
     }
     pause();
   }

@@ -8,7 +8,8 @@
 
 #include "common.hh"
 #include "libpmbuffer.hh"
-#include "trace.hh"
+#include "nvsl/trace.hh"
+#include "nvsl/common.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -36,7 +37,7 @@ constexpr uint64_t WARM_UP_ITER = 16;
 
 void sa(int signal, siginfo_t *si, void *arg) {
   DBGE << "Caught segfault" << std::endl;
-  DBGE << "Stacktrace: \n" << common::get_stack_trace() << std::endl;
+  DBGE << "Stacktrace: \n" << nvsl::get_stack_trace() << std::endl;
   exit(0);
 }
 
