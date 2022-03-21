@@ -6,6 +6,7 @@
 #include <immintrin.h>
 #include <dlfcn.h>
 
+#include "nvsl/common.hh"
 #include "nvsl/envvars.hh"
 #include "nvsl/stats.hh"
 
@@ -31,7 +32,10 @@ extern "C" {
   struct log_t {
     uint64_t addr;
     uint64_t bytes;
+
+    NVSL_BEGIN_IGNORE_WPEDANTIC
     uint64_t val[];
+    NVSL_END_IGNORE_WPEDANTIC
   };
 
   __attribute__((__constructor__))
@@ -51,8 +55,8 @@ extern "C" {
     skip_check_count = new nvsl::Counter();
     logged_check_count = new nvsl::Counter();
     
-    skip_check_count->init("skip_check_count", "Skipped memory checks", false);
-    logged_check_count->init("logged_check_count", "Logged memory checks", false);
+    skip_check_count->init("skip_check_count", "Skipped memory checks");
+    logged_check_count->init("logged_check_count", "Logged memory checks");
 
 
     cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");

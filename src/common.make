@@ -50,6 +50,3 @@ else
 QUIET_MAKE    = $(MAKE)
 endif
 
-.PHONY: release
-release:
-	$(PUDDLES_MAKE) all RELEASE=1

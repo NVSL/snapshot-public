@@ -26,6 +26,7 @@ periodic-msync: periodic-msync.o
 
 
 clean: clean_deps
+	$(PUDDLES_MAKE) -C simplekv_puddles clean
 	-rm -rf *.o dummy cat-demo periodic-msync
 
 include ../deps.make
