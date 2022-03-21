@@ -58,7 +58,7 @@ check: all
 	$(MAKE) -C kyototycoon check
 
 kyotocabinet/Makefile:
-	test -x kyotocabinet/configure && cd kyotocabinet && ./configure --prefix="$(PREFIX)" $(KC_OPTIONS)
+	test -x kyotocabinet/configure && cd kyotocabinet && ./configure --prefix="$(PREFIX)" $(KC_OPTIONS) CPPFLAGS="-iquote../../../src/include"
 
 cabinet: kyotocabinet/Makefile
 	$(MAKE) -j$(NPROCS) -C kyotocabinet
@@ -70,7 +70,7 @@ kyotocabinet/libkyotocabinet.$(SO_EXTENSION): cabinet
 kyototycoon/Makefile: kyotocabinet/libkyotocabinet.a kyotocabinet/libkyotocabinet.$(SO_EXTENSION)
 	$(eval CABINET_ROOT := $(shell awk '/^prefix *=/ {print $$3}' kyotocabinet/Makefile))
 	test -x kyototycoon/configure && cd kyototycoon && \
-	PKG_CONFIG_PATH="../kyotocabinet" CPPFLAGS="-I../kyotocabinet $(CPPFLAGS)" LDFLAGS="-L../kyotocabinet $(LDFLAGS)" \
+	PKG_CONFIG_PATH="../kyotocabinet" CPPFLAGS="-iquote../../../src/include -I../kyotocabinet $(CPPFLAGS)" LDFLAGS="-L../kyotocabinet $(LDFLAGS)" \
 	./configure --prefix="$(PREFIX)" --with-kc="$(CABINET_ROOT)" $(KT_OPTIONS)
 
 tycoon: kyototycoon/Makefile
