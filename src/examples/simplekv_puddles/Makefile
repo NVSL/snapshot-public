@@ -18,11 +18,11 @@ EXTRA_LINKFLAGS +=-luuid -lpthread -lstoreinst -mclwb -ldl -Wl,--whole-archive l
 
 CXX = $(LLVM_DIR)/bin/clang++
 CC = $(LLVM_DIR)/bin/clang
-OPT = $(LLVM_DIR)/bin/opt
+DXX = ../../storeinst-pass/dclang++
 
 include ../../common.make
 
-all: libstoreinst.a
+all: libstoreinst.a libstoreinst.so
 	$(PUDDLES_MAKE) simplekv_puddles_redir
 
 .PHONY: simplekv_puddles_redir
@@ -31,22 +31,17 @@ simplekv_puddles_redir: simplekv_puddles simplekv_puddles.inst
 simplekv_puddles: simplekv_puddles.o
 	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
-simplekv_puddles.bc: simplekv_puddles.cc
-	$(PUDDLES_CXX) $(CXXFLAGS) $(INCLUDE) -c -emit-llvm $^ -o $@ 
-
-simplekv_puddles.opt.bc: simplekv_puddles.bc
-	$(PUDDLES_OPT) -S -load-pass-plugin \
-		../../storeinst-pass/build/libstoreinst.so -passes=hello-world \
-		$^ -o $@
-
-simplekv_puddles.inst: simplekv_puddles.opt.bc
-	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
+simplekv_puddles.inst: simplekv_puddles.cc
+	$(PUDDLES_DXX) $(INCLUDE) $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
 libstoreinst.o: libstoreinst.cc
-	$(PUDDLES_CXX) $(INCLUDE) $(CXXFLAGS) -c $^ -o $@ -mclwb
+	$(PUDDLES_CXX) $(INCLUDE) $(CXXFLAGS) -O0 -c $^ -o $@ -mclwb
 
 libstoreinst.a: libstoreinst.o
 	$(PUDDLES_AR) rcs $@ $^
+
+libstoreinst.so: libstoreinst.o
+	$(PUDDLES_CXX) $(CXXFLAGS) -shared -O0 -o $@ $<
 
 clean: clean_deps
 	-rm -f *.a *.o *.bc *.so *.inst simplekv_puddles

@@ -1,0 +1,3 @@
+[submodule "vendor/cpp-common"]
+	path = vendor/cpp-common
+	url = git@github.com:nvsl/cpp-common.git

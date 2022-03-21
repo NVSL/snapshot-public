@@ -70,7 +70,7 @@ public:
     throw std::out_of_range("no entry in simplekv");
   }
 
-  void put(const std::string &key, const Value &val) {
+  void put(const std::string &key, const Value &val, bool persist = true) {
     // bool tgtKey = false;
     // if (key == "user932529841982028274") {
     //   tgtKey = true;
@@ -94,6 +94,10 @@ public:
         //   std::cout << "found key existsing" << std::endl;
         values[val] = buckets[index][i].second;
 
+        if (persist) {
+          snapshot(&values[val], sizeof(values[val]), MS_SYNC);
+        }
+
         return;
       }
     }
@@ -113,6 +117,8 @@ public:
     //   std::cout << "PUT to index " << index << " pos = "<< pos << std::endl;
     //   std::cout << buckets[index][pos].first<< std::endl;
     // }
-    snapshot(&buckets[index][0], buckets[index].size() * sizeof(buckets[0][0]), MS_SYNC);
+    if (persist) {
+      snapshot(&buckets[index][0], buckets[index].size() * sizeof(buckets[0][0]), MS_SYNC);
+    }
   }
 };

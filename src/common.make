@@ -20,8 +20,9 @@ CXXFLAGS    += $(EXTRA_CXXFLAGS) $(PUDDLE_CXXFLAGS)
 CXXFLAGS    +=$(CLWB_FLAG) $(CLFLUSHOPT_FLAG) $(SFENCE_FLAG)
 LDFLAGS     :=$(EXTRA_LDFLAGS)
 LINKFLAGS   :=$(EXTRA_LINKFLAGS)
-INCLUDE     +=-I$(SELF_DIR)include
-INCLUDE     +=-I$(SELF_DIR)
+INCLUDE     +=-iquote$(SELF_DIR)include
+INCLUDE     +=-iquote$(SELF_DIR)
+INCLUDE     +=-iquote$(SELF_DIR)../vendor/cpp-common/include
 
 ifdef RELEASE
 CXXFLAGS    +=-DRELEASE
@@ -30,6 +31,7 @@ endif
 PUDDLES_CC      =$(QUIET_CC)$(CC)
 PUDDLES_OPT     =$(QUIET_OPT)$(OPT)
 PUDDLES_CXX     =$(QUIET_CXX)$(CXX)
+PUDDLES_DXX     =$(QUIET_DXX)$(DXX)
 PUDDLES_LN      =$(QUIET_LINK)ln
 PUDDLES_MAKE    =+$(QUIET_MAKE)
 PUDDLES_AR      =+$(QUIET_AR)$(AR)
@@ -39,6 +41,7 @@ ifndef V
 QUIET_OPT     = @printf '    %b %b\n' $(CCCOLOR)OPT$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
 QUIET_CC      = @printf '     %b %b\n' $(CCCOLOR)CC$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
 QUIET_CXX     = @printf '    %b %b\n'  $(CCCOLOR)CXX$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+QUIET_DXX     = @printf '    %b %b\n'  $(CCCOLOR)DXX$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
 QUIET_LINK    = @printf '   %b %b\n' $(LINKCOLOR)LINK$(ENDCOLOR) $(BINCOLOR)$@$(ENDCOLOR) 1>&2;
 QUIET_MAKE    = @printf '   %b %b\n'   $(MAKECOLOR)MAKE$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;$(MAKE) -s
 QUIET_AR      = @printf '     %b %b\n'   $(ARCOLOR)AR$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;

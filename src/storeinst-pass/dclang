@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+"""
+@brief  Wrapper to invoke llvm pass using clang
+@author Suyash Mahar <contact@suyashmahar.com>
+"""
+
+from os.path import basename
+import subprocess
+import sys
+import os
+
+PASS_SO = '/home/smahar/git/cxlbuf/src/storeinst-pass/build/libstoreinst.so'
+
+def get_bins(llvm_dir):
+    cxx = os.path.join(llvm_dir, "bin/clang++")
+    cc = os.path.join(llvm_dir, "bin/clang++")
+
+    return cc, cxx
+
+def main(fname):
+    if 'LLVM_DIR' not in os.environ:
+        raise RuntimeError("LLVM_DIR env not set.")
+
+    llvm_dir = os.environ['LLVM_DIR']
+    
+    cc, cxx = get_bins(llvm_dir)
+
+    target = cc
+    
+    # Check if invoking for clang or clang++
+    if fname.endswith('++'):
+        target = cxx
+        
+    args = sys.argv[1:]
+    pass_args = []
+    
+    if 'DISABLE_PASS' not in os.environ:
+        pass_args = ['-fexperimental-new-pass-manager',
+                     '-fpass-plugin=' + PASS_SO,
+                     '-L/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
+                     '-ldl',
+                     '-lstoreinst',
+                     '-Wl,-rpath=/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
+                     '-Wno-unused-command-line-argument']
+    else:
+        pass_args = ['-L/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
+                     '-ldl',
+                     '-lstoreinst',
+                     '-Wl,-rpath=/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/']
+    
+    ret = subprocess.call([target] + pass_args + args)
+    exit(ret)
+            
+if __name__ == "__main__":
+    main(basename(sys.argv[0]))

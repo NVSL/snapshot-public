@@ -29,6 +29,7 @@ void *alloc(void *region, size_t bytes) {
   return (char*)region + bytes;
 }
 
+__attribute__((__annotate__(("do_not_auto_log"))))
 void show_usage(char *argv[]) {
   std::cerr << "USAGE: " << std::endl
             << "\t" << argv[0] << " puddle-name (get key | put key value)\n"
@@ -84,7 +85,6 @@ int main(int argc, char *argv[]) {
         msync(root, MIN_POOL_SZ*10, MS_SYNC);
     }
 
-    startTracking = true;
     if (std::string(argv[2]) == "get" && argc == 4) {
       std::cout << root->get(argv[3]) << std::endl;
     } else if (std::string(argv[2]) == "put" && argc == 5) {
@@ -155,20 +155,21 @@ int main(int argc, char *argv[]) {
           std::cout << (iter*100)/load_keys.size() << "%...";
           std::flush(std::cout);
         }
-        root->put(key, value);
+        root->put(key, value, false);
         // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
       }
       std::cout << std::endl;
 
       /* Execute the run trace */
       std::cout << "Executing run trace" << std::endl;
+      startTracking = true;          
       size_t run_size = run_ops.size();
       clk.tick();
       volatile size_t result = 0;
       for (size_t run = 0; run < 1; run++) {
         for (size_t i = 0; i < run_size; ++i) {
           if (run_ops[i] == "Update") {
-            root->put(run_keys[i], value);
+            root->put(run_keys[i], value, true);
             // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
           } else if (run_ops[i] == "Read") {
             try {
