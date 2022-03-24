@@ -1,15 +1,31 @@
+ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+
+.PHONY: all
 all: bin lib | check_compiler
 	$(PUDDLES_MAKE) -C src
+	$(PUDDLES_MAKE) vendor
+
+.PHONY: vendor
+vendor:
+	$(PUDDLES_MAKE) -C vendor CC=$(ROOT_DIR)/bin/dclang \
+		CXX=$(ROOT_DIR)/bin/dclang++ \
+		DCLANG_LIBS_DIR="$(ROOT_DIR)/lib"
 
 release:
 	$(PUDDLES_MAKE) all PUDDLES_CXXFLAGS="-DRELEASE" RELEASE=1
 
-clean: clean_src
-	@-rm -rf bin/ lib/ 
+.PHONY: clean
+clean: clean_src clean_vendor
+	@-rm -rf bin/ lib/
 	@-rm -f .so_deps
 
+.PHONY: clean_src
 clean_src:
 	$(PUDDLES_MAKE) -C src clean PERFORM_CHECKS=0
+
+.PHONY: clean_vendor
+clean_vendor:
+	$(PUDDLES_MAKE) -C vendor clean
 
 bin:
 	@mkdir -p bin/
@@ -18,7 +34,6 @@ bin:
 lib:
 	@mkdir -p lib/
 
-.PHONY: all
 
 include src/common.make
 include src/checks.make

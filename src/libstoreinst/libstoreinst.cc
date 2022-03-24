@@ -1,10 +1,11 @@
-#include <fcntl.h>
-#include <iostream>
 #include "common.hh"
 #include <cassert>
-#include <sys/mman.h>
-#include <immintrin.h>
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <immintrin.h>
+#include <iostream>
+#include <numeric>
+#include <sys/mman.h>
 
 #include "nvsl/common.hh"
 #include "nvsl/envvars.hh"
@@ -15,6 +16,7 @@
 #define BUF_SIZE (100 * 1000 * 4096)
 
 static nvsl::Counter *skip_check_count, *logged_check_count;
+static nvsl::StatsFreq<> *tx_log_count_dist;
 
 extern "C" {
   static void *start_addr, *end_addr = nullptr;
@@ -38,46 +40,60 @@ extern "C" {
     NVSL_END_IGNORE_WPEDANTIC
   };
 
-  __attribute__((__constructor__))
-  void libstoreinst_ctor() {
+  void init_dlsyms() {
     real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
-    if (nullptr == real_memcpy) {
-      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+    if (real_memcpy == nullptr) {
+      std::cerr << "dlsym failed for memcpy: " << dlerror() << std::endl;
       exit(1);
     }
-
     real_memmove = (memcpy_sign)dlsym(RTLD_NEXT, "memmove");
-    if (nullptr == real_memmove) {
-      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+    if (real_memmove == nullptr) {
+      std::cerr << "dlsym failed for memmove: " << dlerror() << std::endl;
       exit(1);
     }
+  }
 
+  void init_counters() {
     skip_check_count = new nvsl::Counter();
     logged_check_count = new nvsl::Counter();
-    
+    tx_log_count_dist = new nvsl::StatsFreq<>();
+
     skip_check_count->init("skip_check_count", "Skipped memory checks");
     logged_check_count->init("logged_check_count", "Logged memory checks");
+    tx_log_count_dist->init("tx_log_count_dist", "Distribution of number of logs in a transaction", 5, 0, 30);
+  }
 
-
-    cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
-  
+  void init_addrs() {
     const auto start_addr_str = get_env_str(PMEM_START_ADDR_ENV);
-    const auto end_addr_str = get_env_str(PMEM_END_ADDR_ENV);
-
     if (start_addr_str == "") {
-      fprintf(stderr, "%s not set\n", PMEM_START_ADDR_ENV);
+      std::cerr << "PMEM_START_ADDR not set" << std::endl;
       exit(1);
     }
 
+    const auto end_addr_str = get_env_str(PMEM_END_ADDR_ENV);
     if (end_addr_str == "") {
-      fprintf(stderr, "%s not set\n", PMEM_END_ADDR_ENV);
+      std::cerr << "PMEM_END_ADDR not set" << std::endl;
       exit(1);
     }
-
-    printf("Values = %s, %s\n", start_addr_str.c_str(), end_addr_str.c_str());
-
+    
     start_addr = (void*)std::stoull(start_addr_str, 0, 16);
     end_addr = (void*)std::stoull(end_addr_str, 0, 16);
+    
+    assert(start_addr != nullptr);
+    assert(end_addr != nullptr);
+    
+    assert(start_addr < end_addr);
+
+    printf("Values = %s, %s\n", start_addr_str.c_str(), end_addr_str.c_str());
+  }
+
+  __attribute__((__constructor__))
+  void libstoreinst_ctor() {
+    init_dlsyms();
+    init_counters();
+    init_addrs();
+
+    cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
 
     printf("Address range = [%p:%p]\n", start_addr, end_addr);
 
@@ -140,15 +156,17 @@ extern "C" {
       assert(current_log_off < BUF_SIZE);
 
     }
-  }  
+  }
   
   __attribute__((unused))
   void checkMemory(void* ptr) {
-    if (start_addr < ptr and ptr < end_addr and startTracking) {
-      log_range(ptr, 8);
-    } else {
-      ++*skip_check_count;
-    }
+    if (startTracking) {
+      if (start_addr < ptr and ptr < end_addr) {
+        log_range(ptr, 8);
+      } else {
+        ++*skip_check_count;
+      }
+      }
   }
 
   __attribute__((destructor))
@@ -156,12 +174,11 @@ extern "C" {
     std::cerr << "Summary:\n";
     std::cerr << skip_check_count->str() << "\n";
     std::cerr << logged_check_count->str() << "\n";
+    std::cerr << tx_log_count_dist->str() << "\n";
   }
 
-  __attribute__((unused,always_inline))
+  __attribute__((unused))
   int snapshot(void *addr, size_t bytes, int flags) {
-    // printf("msync(%p, %lu, %d). storeInstEnabled = %d\n", addr, bytes, flags,
-           // storeInstEnabled);
     if (storeInstEnabled) {
       auto log = (log_t*)log_area;
       size_t total_proc = 0;
@@ -185,15 +202,12 @@ extern "C" {
         total_proc++;
         i += sizeof(log_t) + log_entry.bytes;
       }
-          printf("Processed %lu logs\n", total_proc);
+      tx_log_count_dist->add(total_proc);
       _mm_sfence();
         
     } else {
-      // printf("msync(%p, %lu, %d)\n", addr, bytes, flags);
       void *pg_aligned = (void*)(((size_t)addr>>12)<<12);
 
-      // printf("aligned %p to %p\n", addr, pg_aligned);
-      
       int mret = msync(pg_aligned, bytes, flags);
 
       if (-1 == mret) {

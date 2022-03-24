@@ -42,8 +42,6 @@ void show_usage(char *argv[]) {
 int main(int argc, char *argv[]) {
   std::cout << "---" << std::endl;
 
-  libstoreinst_ctor();
-
   if (argc < 3) {
     show_usage(argv);
     return 1;

@@ -35,20 +35,23 @@ def main(fname):
     args = sys.argv[1:]
     pass_args = []
     
+    if 'DCLANG_LIBS_DIR' in os.environ:
+        libs_dir = os.environ['DCLANG_LIBS_DIR']
+
+        pass_args += ['-L' + libs_dir]
+        pass_args += ['-Wl,-rpath=' + libs_dir]
+
     if 'DISABLE_PASS' not in os.environ:
-        pass_args = ['-fexperimental-new-pass-manager',
-                     '-fpass-plugin=' + PASS_SO,
-                     '-L/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
-                     '-ldl',
-                     '-lstoreinst',
-                     '-Wl,-rpath=/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
-                     '-Wno-unused-command-line-argument']
+        pass_args += ['-fexperimental-new-pass-manager',
+                      '-fpass-plugin=' + PASS_SO,
+                      '-ldl',
+                      '-lstoreinst',
+                      '-Wno-unused-command-line-argument']
     else:
-        pass_args = ['-L/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/',
-                     '-ldl',
-                     '-lstoreinst',
-                     '-Wl,-rpath=/home/smahar/git/cxlbuf/src/examples/simplekv_puddles/']
-    
+        pass_args += ['-ldl',
+                      '-lstoreinst']
+
+    print(pass_args)
     ret = subprocess.call([target] + pass_args + args)
     exit(ret)
             
