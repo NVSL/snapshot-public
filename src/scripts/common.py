@@ -124,3 +124,69 @@ def clk_to_ns(clk: str) -> int:
             result += int(tok[:-1])*(10**9)
         
     return result
+
+fontsize_gbl = None
+figsize_gbl = None
+
+def set_params(fontsize, figsize):
+    global fontsize_gbl
+    global figsize_gbl
+    
+    fontsize_gbl = fontsize
+    figsize_gbl = figsize
+
+def get_kwargs(**kwargs):
+    return {**kwargs, **{
+        'fontsize': fontsize_gbl, 
+        'figsize': figsize_gbl,
+        'edgecolor': 'black'
+    }}
+    
+def fmt_legend(ax, loc='upper center'):
+    if loc != 'upper center':
+        raise Exception("Unimplemented")
+        
+    bbox_to_anchor = (0, 0)
+        
+    if loc == 'upper center':
+        bbox_to_anchor = (0.5, 1.55)
+        
+    _ = ax.legend(
+        fontsize=fontsize_gbl, 
+        fancybox=False, 
+        framealpha=1, 
+        ncol=3, 
+        loc='upper center', 
+        bbox_to_anchor=bbox_to_anchor, 
+        edgecolor='black'
+    )
+def fmt_label(ax, xlabel, ylabel):
+    ax.set_xlabel(xlabel, fontsize=fontsize_gbl)
+    ax.set_ylabel(ylabel, fontsize=fontsize_gbl)
+    
+def add_bar_labels(ax, mask):
+    rects = ax.patches
+    mask_full = mask
+    
+    if len(rects)%len(mask) != 0:
+        raise Exception("Bars in the axis must be a multiple of mask length")
+    
+    if len(mask) != len(rects):
+        mask_full = []
+        factor = int(len(rects)/len(mask))
+        for i in range(len(mask)):
+            mask_full += [mask[i]] * factor
+            
+    i = 0
+    for rect in rects:
+        i += 1
+        if not mask_full[i-1]:
+            continue
+            
+        height = rect.get_height()
+        label = round(height, 1)
+        ax.text(
+            rect.get_x() + rect.get_width() / 2, 3, f"{label}x", ha="center", va="bottom",
+            fontsize=fontsize_gbl-1
+        )
+    
