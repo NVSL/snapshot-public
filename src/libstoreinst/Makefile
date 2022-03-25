@@ -28,7 +28,7 @@ $(TARGET).a: $(OBJECTS)
 	$(PUDDLES_AR) rcs $@ $^
 
 
-clean: kelly_hoh_code_clean
+clean: 
 	-rm -f *.o *.so *.a
 
 include ../deps.make

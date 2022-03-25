@@ -30,7 +30,8 @@ libpmbuffer:
 ../bin/dclang ../bin/dclang++:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../bin/%, ../src/storeinst-pass/%, $@)) $@
 
-clean: libpmbuffer_clean libdsaemu_clean examples_clean
+clean: libpmbuffer_clean libdsaemu_clean examples_clean storeinst-pass_clean \
+	scripts_clean libstoreinst_clean
 
 %_clean:
 	$(PUDDLES_MAKE) -C $(subst _clean,,$@) clean

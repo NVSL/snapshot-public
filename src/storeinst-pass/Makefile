@@ -4,4 +4,4 @@ all:
 	make -C build
 
 clean:
-	@rm -rf build/ .cache
+	@rm -rf build/ .cache *.o
