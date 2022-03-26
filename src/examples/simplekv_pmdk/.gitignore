@@ -1,0 +1,4 @@
+simplekv_pmdk
+simplekv_pmdk.o
+simplekv_pmdk_file
+.clang-format

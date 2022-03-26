@@ -1,4 +1,4 @@
-.PHONY: simplekv_puddles
+.PHONY: simplekv_cxlbuf simplekv_pmdk
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -10,10 +10,10 @@ EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
 include ../common.make
 
-all: dummy cat-demo periodic-msync simplekv_puddles
+all: dummy cat-demo periodic-msync simplekv_cxlbuf simplekv_pmdk
 
-simplekv_puddles:
-	$(PUDDLES_MAKE) -C simplekv_puddles
+simplekv_cxlbuf simplekv_pmdk:
+	$(PUDDLES_MAKE) -C $@
 
 dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
@@ -26,7 +26,8 @@ periodic-msync: periodic-msync.o
 
 
 clean: clean_deps 
-	$(PUDDLES_MAKE) -C simplekv_puddles clean
+	$(PUDDLES_MAKE) -C simplekv_cxlbuf clean
+	$(PUDDLES_MAKE) -C simplekv_pmdk clean
 	$(PUDDLES_MAKE) -C kelly_hoh_code clean
 	-rm -rf *.o dummy cat-demo periodic-msync
 

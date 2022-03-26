@@ -7,7 +7,11 @@
  */
 
 #pragma once
+
 #include <unistd.h>
+
+#define BUF_SIZE (100 * 1000 * 4096)
+
 
 extern "C" {
   void *memcpy(void *__restrict dst, const void *__restrict src, size_t n)
@@ -20,4 +24,11 @@ extern "C" {
   int snapshot(void *addr, size_t length, int flags);
 
   void libstoreinst_ctor();
+
+  extern void *start_addr, *end_addr;
+  extern char *log_area, *pm_back;
+  extern size_t current_log_off;
+  extern bool startTracking;
+  extern bool storeInstEnabled;
+  extern bool cxlModeEnabled;
 }

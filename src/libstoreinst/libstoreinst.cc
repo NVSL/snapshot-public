@@ -1,58 +1,30 @@
-#include "common.hh"
 #include <cassert>
-#include <dlfcn.h>
 #include <fcntl.h>
 #include <immintrin.h>
 #include <iostream>
 #include <numeric>
 #include <sys/mman.h>
 
+#include "common.hh"
+#include "libc_wrappers.hh"
+#include "libstoreinst.hh"
+#include "log.hh"
 #include "nvsl/common.hh"
 #include "nvsl/envvars.hh"
 #include "nvsl/stats.hh"
 
-#define PMEM_START_ADDR_ENV "PMEM_START_ADDR"
-#define PMEM_END_ADDR_ENV "PMEM_END_ADDR"
-#define BUF_SIZE (100 * 1000 * 4096)
-
-static nvsl::Counter *skip_check_count, *logged_check_count;
-static nvsl::StatsFreq<> *tx_log_count_dist;
+NVSL_DECL_ENV(PMEM_START_ADDR);
+NVSL_DECL_ENV(PMEM_END_ADDR);
 
 extern "C" {
-  static void *start_addr, *end_addr = nullptr;
-  static char *log_area, *pm_back;
-  static size_t current_log_off = 0;
+  void *start_addr, *end_addr = nullptr;
+  char *log_area, *pm_back;
+  size_t current_log_off = 0;
   bool startTracking = false;
-  static bool storeInstEnabled = false;
-  static bool cxlModeEnabled = false;
+  bool storeInstEnabled = false;
+  bool cxlModeEnabled = false;
+
   
-#define MEMCPY_SIGN (void *(*)(void *, const void *, size_t))
-  typedef void* (*memcpy_sign)(void*,const void*,size_t);
-  static void* (*real_memcpy)(void*,const void*,size_t) = nullptr;
-  static void* (*real_memmove)(void*,const void*,size_t) = nullptr;
-
-  struct log_t {
-    uint64_t addr;
-    uint64_t bytes;
-
-    NVSL_BEGIN_IGNORE_WPEDANTIC
-    uint64_t val[];
-    NVSL_END_IGNORE_WPEDANTIC
-  };
-
-  void init_dlsyms() {
-    real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
-    if (real_memcpy == nullptr) {
-      std::cerr << "dlsym failed for memcpy: " << dlerror() << std::endl;
-      exit(1);
-    }
-    real_memmove = (memcpy_sign)dlsym(RTLD_NEXT, "memmove");
-    if (real_memmove == nullptr) {
-      std::cerr << "dlsym failed for memmove: " << dlerror() << std::endl;
-      exit(1);
-    }
-  }
-
   void init_counters() {
     skip_check_count = new nvsl::Counter();
     logged_check_count = new nvsl::Counter();
@@ -130,33 +102,6 @@ extern "C" {
   
     printf("Mounted log area at %p\n", (void*)log_area);
   }
-
-  void log_range(void *start, size_t bytes) {
-    auto &log_entry = *(log_t*)((char*)log_area + current_log_off);
-    
-    if (log_area != nullptr and cxlModeEnabled) {
-      storeInstEnabled = true;
-      
-      // printf("checking mem %p\n", ptr);
-      log_entry.addr = (uint64_t)start;
-      log_entry.bytes = bytes;
-
-      real_memcpy(&log_entry.val, start, bytes);
-
-      const auto cl_count = (sizeof(log_t) + bytes+63)/64;
-      size_t cur_cl = 0;
-      while (cur_cl < cl_count) {
-        _mm_clwb((char*)&log_entry + cur_cl*64);
-        cur_cl++;
-      }
-      _mm_sfence();
-      ++*logged_check_count;
-      current_log_off += sizeof(log_t) + bytes;
-
-      assert(current_log_off < BUF_SIZE);
-
-    }
-  }
   
   __attribute__((unused))
   void checkMemory(void* ptr) {
@@ -217,21 +162,5 @@ extern "C" {
     }
     current_log_off = 0;
     return 0;
-  }
-
-  void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) {
-    if (startTracking and start_addr != nullptr and start_addr <= dst and dst < end_addr) {
-      log_range(dst, n);
-    }
-    
-    return real_memcpy(dst, src, n);
-  }
-
-  void *memmove(void *__restrict dst, const void *__restrict src, size_t n) {
-    if (startTracking and start_addr != nullptr and start_addr <= dst and dst < end_addr) {
-      log_range(dst, n);
-    }
-
-    return real_memmove(dst, src, n);
   }
 }

@@ -1,4 +1,4 @@
-.PHONY: libdsaemu libpmbuffer libstoreinst examples
+.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass
 
 include common.make
 
@@ -8,7 +8,7 @@ dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
 	$(PUDDLES_MAKE) ../bin/dclang++
 
-examples: libstoreinst
+examples: libstoreinst storeinst-pass
 	$(PUDDLES_MAKE) -C examples
 
 libdsaemu:
@@ -19,6 +19,9 @@ libstoreinst:
 	$(PUDDLES_MAKE) -C libstoreinst
 	$(PUDDLES_MAKE) ../lib/libstoreinst.so
 	$(PUDDLES_MAKE) ../lib/libstoreinst.a
+
+storeinst-pass:
+	$(PUDDLES_MAKE) -C storeinst-pass
 
 libpmbuffer:
 	$(PUDDLES_MAKE) -C libpmbuffer

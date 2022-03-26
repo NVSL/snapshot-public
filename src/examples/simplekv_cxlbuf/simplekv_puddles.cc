@@ -15,7 +15,7 @@
 
 #include "common.hh"
 #include "libstoreinst.hh"
-#include "clock.hh"
+#include "nvsl/clock.hh"
 
 #include "simplekv_puddles.hh"
 

@@ -12,29 +12,31 @@ import os
 
 PASS_SO = '/home/smahar/git/cxlbuf/src/storeinst-pass/build/libstoreinst.so'
 
+
 def get_bins(llvm_dir):
     cxx = os.path.join(llvm_dir, "bin/clang++")
     cc = os.path.join(llvm_dir, "bin/clang++")
 
     return cc, cxx
 
+
 def main(fname):
     if 'LLVM_DIR' not in os.environ:
         raise RuntimeError("LLVM_DIR env not set.")
 
     llvm_dir = os.environ['LLVM_DIR']
-    
+
     cc, cxx = get_bins(llvm_dir)
 
     target = cc
-    
+
     # Check if invoking for clang or clang++
     if fname.endswith('++'):
         target = cxx
-        
+
     args = sys.argv[1:]
     pass_args = []
-    
+
     if 'DCLANG_LIBS_DIR' in os.environ:
         libs_dir = os.environ['DCLANG_LIBS_DIR']
 
@@ -51,9 +53,9 @@ def main(fname):
         pass_args += ['-ldl',
                       '-lstoreinst']
 
-    print(pass_args)
     ret = subprocess.call([target] + pass_args + args)
-    exit(ret)
-            
+    sys.exit(ret)
+
+
 if __name__ == "__main__":
     main(basename(sys.argv[0]))
