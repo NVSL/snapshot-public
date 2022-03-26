@@ -125,68 +125,100 @@ def clk_to_ns(clk: str) -> int:
         
     return result
 
-fontsize_gbl = None
-figsize_gbl = None
+class Fig(object):
+    fontsize_gbl = None
+    figsize_gbl = None
+    ax = None
+    
+    def config(fontsize, figsize):
+        Fig.fontsize_gbl = fontsize
+        Fig.figsize_gbl = figsize
 
-def set_params(fontsize, figsize):
-    global fontsize_gbl
-    global figsize_gbl
-    
-    fontsize_gbl = fontsize
-    figsize_gbl = figsize
 
-def get_kwargs(**kwargs):
-    return {**kwargs, **{
-        'fontsize': fontsize_gbl, 
-        'figsize': figsize_gbl,
-        'edgecolor': 'black'
-    }}
-    
-def fmt_legend(ax, loc='upper center'):
-    if loc != 'upper center':
-        raise Exception("Unimplemented")
-        
-    bbox_to_anchor = (0, 0)
-        
-    if loc == 'upper center':
-        bbox_to_anchor = (0.5, 1.55)
-        
-    _ = ax.legend(
-        fontsize=fontsize_gbl, 
-        fancybox=False, 
-        framealpha=1, 
-        ncol=3, 
-        loc='upper center', 
-        bbox_to_anchor=bbox_to_anchor, 
-        edgecolor='black'
-    )
-def fmt_label(ax, xlabel, ylabel):
-    ax.set_xlabel(xlabel, fontsize=fontsize_gbl)
-    ax.set_ylabel(ylabel, fontsize=fontsize_gbl)
-    
-def add_bar_labels(ax, mask):
-    rects = ax.patches
-    mask_full = mask
-    
-    if len(rects)%len(mask) != 0:
-        raise Exception("Bars in the axis must be a multiple of mask length")
-    
-    if len(mask) != len(rects):
-        mask_full = []
-        factor = int(len(rects)/len(mask))
-        for i in range(len(mask)):
-            mask_full += [mask[i]] * factor
+    def __init__(self, ax, fontsize=None, figsize=None):
+        if fontsize != None:
+            Fig.fontsize_gbl = fontsize
             
-    i = 0
-    for rect in rects:
-        i += 1
-        if not mask_full[i-1]:
-            continue
-            
-        height = rect.get_height()
-        label = round(height, 1)
-        ax.text(
-            rect.get_x() + rect.get_width() / 2, 3, f"{label}x", ha="center", va="bottom",
-            fontsize=fontsize_gbl-1
+        if figsize != None:
+            Fig.figsize_gbl = figsize
+        
+        self.ax = ax
+
+    def get_kwargs(**kwargs):
+        return {**kwargs, **{
+            'fontsize': Fig.fontsize_gbl, 
+            'figsize': Fig.figsize_gbl,
+            'edgecolor': 'black',
+            'zorder': 3,
+        }}
+
+    def fmt_grid(self, axis='both'):
+        self.ax.grid(axis=axis)
+
+        return self
+
+    def fmt_legend(self, loc='upper center'):
+        if loc != 'upper center':
+            raise Exception("Unimplemented")
+
+        bbox_to_anchor = (0, 0)
+
+        if loc == 'upper center':
+            bbox_to_anchor = (0.5, 1.55)
+
+        _ = self.ax.legend(
+            fontsize=Fig.fontsize_gbl, 
+            fancybox=False, 
+            framealpha=1, 
+            ncol=3, 
+            loc='upper center', 
+            bbox_to_anchor=bbox_to_anchor, 
+            edgecolor='black'
         )
+
+        return self
+
+    def fmt_label(self, xlabel, ylabel):
+        self.ax.set_xlabel(xlabel, fontsize=Fig.fontsize_gbl)
+        self.ax.set_ylabel(ylabel, fontsize=Fig.fontsize_gbl)
+
+        return self
+
+    def add_bar_labels(self, mask):
+        rects = self.ax.patches
+        mask_full = mask
+
+        if len(rects)%len(mask) != 0:
+            raise Exception("Bars in the axis must be a multiple of mask length")
+
+        if len(mask) != len(rects):
+            mask_full = []
+            factor = int(len(rects)/len(mask))
+            for i in range(len(mask)):
+                mask_full += [mask[i]] * factor
+
+        i = 0
+        for rect in rects:
+            i += 1
+            if not mask_full[i-1]:
+                continue
+
+            height = rect.get_height()
+            label = round(height, 1)
+            self.ax.text(
+                rect.get_x() + rect.get_width() / 2, 3, f"{label}x", ha="center", va="bottom",
+                fontsize=Fig.fontsize_gbl-1
+            )
+
+        return self
     
+    def save(self, name):
+        save_fig(name)
+        
+        return self
+        
+    def xrot(self, rot=0):
+        xlbl = self.ax.get_xticklabels()
+        _ = self.ax.set_xticklabels(xlbl, rotation=0)
+        
+        return self

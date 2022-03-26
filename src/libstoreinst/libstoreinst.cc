@@ -147,6 +147,8 @@ extern "C" {
         total_proc++;
         i += sizeof(log_t) + log_entry.bytes;
       }
+      // std::cout << "total_proc = " << total_proc << "\n";
+      
       tx_log_count_dist->add(total_proc);
       _mm_sfence();
         
