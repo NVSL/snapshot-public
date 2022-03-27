@@ -56,8 +56,7 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    auto start_addr_str = get_env_str("PMEM_START_ADDR");
-    auto start_addr = (void*)std::stoull(start_addr_str, 0, 16);
+    auto start_addr = nullptr;
     auto addr = mmap(start_addr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE,
                     MAP_SHARED_VALIDATE | MAP_FIXED, fd, 0);
 
@@ -65,11 +64,6 @@ int main(int argc, char *argv[]) {
 
     if (addr == (void*)-1) {
       perror("mmap failed");
-      exit(1);
-    }
-
-    if (addr != start_addr) {
-      fprintf(stderr, "Unable to map at requested location\n");
       exit(1);
     }
 

@@ -77,7 +77,7 @@ extern "C" {
       exit(1);
     }
   
-    log_area = (char*)mmap((char*)end_addr-(BUF_SIZE*2), BUF_SIZE,
+    log_area = (char*)real_mmap((char*)end_addr-(BUF_SIZE*2), BUF_SIZE,
                            PROT_READ | PROT_WRITE,
                            MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
 
@@ -92,7 +92,7 @@ extern "C" {
       exit(1);
     }
 
-    pm_back = (char*)mmap(NULL, 1024*1024*1024, PROT_READ | PROT_WRITE,
+    pm_back = (char*)real_mmap(NULL, 1024*1024*1024, PROT_READ | PROT_WRITE,
                           MAP_SYNC | MAP_SHARED_VALIDATE, pm_backing_fd, 0);
 
     if (pm_back == (char*)-1) {

@@ -8,3 +8,4 @@
 void init_dlsyms();
 extern void *(*real_memcpy)(void *, const void *, size_t);
 extern void *(*real_memmove)(void *, const void *, size_t);
+extern void *(*real_mmap)(void*, size_t, int, int, int, __off_t);
