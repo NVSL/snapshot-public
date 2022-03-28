@@ -1,3 +1,6 @@
 [submodule "vendor/cpp-common"]
 	path = vendor/cpp-common
 	url = git@github.com:nvsl/cpp-common.git
+[submodule "vendor/interprocess"]
+	path = vendor/interprocess
+	url = git@github.com:boostorg/interprocess.git
