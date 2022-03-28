@@ -159,6 +159,9 @@ extern "C" {
 
       if (-1 == mret) {
         perror("msync for snapshot failed");
+        fprintf(stderr, "> Dumping maps");
+        std::string map_cmd = "cat /proc/" + std::to_string(getpid()) + "/maps >&2";
+        system(map_cmd.c_str());
         exit(1);
       }
     }

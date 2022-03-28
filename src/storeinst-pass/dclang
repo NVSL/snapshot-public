@@ -15,7 +15,7 @@ PASS_SO = '/home/smahar/git/cxlbuf/src/storeinst-pass/build/libstoreinst.so'
 
 def get_bins(llvm_dir):
     cxx = os.path.join(llvm_dir, "bin/clang++")
-    cc = os.path.join(llvm_dir, "bin/clang++")
+    cc = os.path.join(llvm_dir, "bin/clang")
 
     return cc, cxx
 
