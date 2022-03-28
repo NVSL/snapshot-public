@@ -1,0 +1,4 @@
+* CXLBUF
+
+** Dependencies
+- Boost.Interprocess (included)
