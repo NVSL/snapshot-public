@@ -4,3 +4,9 @@
 [submodule "vendor/interprocess"]
 	path = vendor/interprocess
 	url = git@github.com:boostorg/interprocess.git
+[submodule "vendor/move"]
+	path = vendor/move
+	url = git@github.com:boostorg/move.git
+[submodule "vendor/config"]
+	path = vendor/config
+	url = git@github.com:boostorg/config.git
