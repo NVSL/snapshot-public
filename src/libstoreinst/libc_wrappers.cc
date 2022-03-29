@@ -110,9 +110,14 @@ void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) __THROW
 
 void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
   __THROW {
+  bool memmove_logged = false;
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
     log_range(dst, n);
+    memmove_logged = true;
   }
+  
+  DBGH(4) << "memmove(" << dst << ", " << src << ", " << n << "), logged = "
+          << memmove_logged << std::endl;
 
   return real_memmove(dst, src, n);
 }
@@ -185,18 +190,17 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   const auto prot_str = nvsl::zip(prot, " | ");
 
 
-  fprintf(stderr, "Call to mmap intercepted: mmap(%p, %lu, %s, %s, %d (=%s), %ld)\n",
-          __addr, __len, prot_str.c_str(), flags_str.c_str(), __fd, buf, __offset);
+  DBGH(3) << "Call to mmap intercepted: mmap(" << __addr << ", " << __len
+          << ", " << prot_str << ", " << flags_str << ", " << __fd << ", "
+          << nvsl::S(buf) << ", " << __offset << std::endl;
 
   void *result = real_mmap(__addr, __len, __prot, __flags, __fd, __offset);
 
   if (result != nullptr) {
     const addr_range_t val = {(size_t)(__addr), (size_t)((char*)__addr + __len)};
-    fprintf(stderr, "mapped_addr address = %p\n", (void*)&mapped_addr);
     mapped_addr.insert_or_assign(__fd, val);
-    fprintf(stderr, "mmap_addr recorded %d -> %p,%p\n", __fd, (void*)val.start,
-            (void*)val.end);
-    fprintf(stderr, "mapped_addr[%d]=[%p,%p]\n", __fd, (void*)val.start, (void*)val.end);
+    DBGH(2) << "mmap_addr recorded " << __fd << " -> " << (void*)val.start
+            << (void*)val.end << std::endl;
 
     if (not addr_in_range(result)) {
       DBGE << "Cannot map pmem file in range" << std::endl;
@@ -216,8 +220,8 @@ void *mmap64(void *addr, size_t len, int prot, int flags, int fd, __off64_t off)
 } 
 
 void sync(void) __THROW {
-  fprintf(stderr, "Call to sync intercepted\n");
-  fprintf(stderr, "Unimplemented\n");
+  DBGE << "Call to sync intercepted\n";
+  DBGE << "Unimplemented\n";
   exit(1);
 
   real_sync();
@@ -229,8 +233,8 @@ int msync(void *__addr, size_t __len, int __flags) {
 
 
 int fsync(int __fd) __THROW {
-  fprintf(stderr, "Call to fsync intercepted: fsync(%d)\n", __fd);
-  fprintf(stderr, "Unimplemented\n");
+  DBGE << "Call to fsync intercepted: fsync(" << __fd << ")";
+  DBGE << "Unimplemented\n";
   exit(1);
 
   return real_fsync(__fd);
@@ -238,7 +242,7 @@ int fsync(int __fd) __THROW {
 
 void *mremap (void *__addr, size_t __old_len, size_t __new_len,
               int __flags, ...) __THROW {
-  fprintf(stderr, "Unimplemented\n");
+  DBGE << "Unimplemented\n";
   exit(1);
   return real_mremap(__addr, __old_len, __new_len, __flags);
 }
@@ -270,9 +274,14 @@ int fdatasync (int __fildes) {
 
 __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
+  DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
+          << ")\n";
   if (storeInstEnabled) {
+    DBGH(1) << "Calling snapshot (not msync)" << std::endl;
+
     auto log = (log_t*)log_area;
     size_t total_proc = 0;
+    size_t bytes_flushed = 0;
     for (size_t i = 0; i < current_log_off;) {
       auto &log_entry = *(log_t*)((char*)log + i);
       
@@ -284,21 +293,27 @@ int snapshot(void *addr, size_t bytes, int flags) {
         *(uint64_t*)dst_addr = *(uint64_t*)log_entry.addr;
 
         log_entry.addr = 0;
+
         
         _mm_clwb((void*)dst_addr);
       } else if (log_entry.addr == 0) {
         break;
       }
 
+      bytes_flushed += log_entry.bytes;
       total_proc++;
       i += sizeof(log_t) + log_entry.bytes;
+      DBGH(4) << "Entry size: " << log_entry.bytes << std::endl;
     }
     DBGH(4) << "total_proc = " << total_proc << "\n";
+    DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
     
     tx_log_count_dist->add(total_proc);
     _mm_sfence();
       
   } else {
+    DBGH(1) << "Calling real msync" << std::endl;
+    
     void *pg_aligned = (void*)(((size_t)addr>>12)<<12);
 
     const int mret = real_msync(pg_aligned, bytes, flags);
@@ -314,7 +329,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
 }
 
 int munmap (void *__addr, size_t __len) __THROW {
-  fprintf(stderr, "mumap intercepted\n");
+  DBGH(4) << "mumap intercepted\n";
   for (auto &range : mapped_addr) {
     if (__addr >= (void*)range.second.start 
         && __addr < (void*)range.second.end) {

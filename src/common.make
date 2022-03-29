@@ -42,16 +42,28 @@ PUDDLES_MAKE    =+$(QUIET_MAKE)
 PUDDLES_AR      =+$(QUIET_AR)$(AR)
 PUDDLES_INSTALL =+$(QUIET_INSTALL)install
 
-ifndef V
-QUIET_OPT     = @printf '    %b %b\n' $(CCCOLOR)OPT$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_CC      = @printf '     %b %b\n' $(CCCOLOR)CC$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_CXX     = @printf '    %b %b\n'  $(CCCOLOR)CXX$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_DXX     = @printf '    %b %b\n'  $(CCCOLOR)DXX$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_LINK    = @printf '   %b %b\n' $(LINKCOLOR)LINK$(ENDCOLOR) $(BINCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_MAKE    = @printf '   %b %b\n'   $(MAKECOLOR)MAKE$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;$(MAKE) -s
-QUIET_AR      = @printf '     %b %b\n'   $(ARCOLOR)AR$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
-QUIET_INSTALL = @printf '%b %b\n'   $(INSTALLCOLOR)INSTALL$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+ifneq (,$(findstring dclang,$(CC)))
+  CC_NAME := DC
 else
-QUIET_MAKE    = $(MAKE)
+  CC_NAME := CC
+endif
+
+ifneq (,$(findstring dclang++,$(CXX)))
+  CXX_NAME := DXX
+else
+  CXX_NAME := CXX
+endif
+
+ifndef V
+  QUIET_OPT     = @printf '    %b %b\n' $(CCCOLOR)OPT$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_CC      = @printf '     %b %b\n' $(CCCOLOR)$(CC_NAME)$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_CXX     = @printf '    %b %b\n'  $(CCCOLOR)$(CXX_NAME)$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_DXX     = @printf '    %b %b\n'  $(CCCOLOR)DXX$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_LINK    = @printf '   %b %b\n' $(LINKCOLOR)LINK$(ENDCOLOR) $(BINCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_MAKE    = @printf '   %b %b\n'   $(MAKECOLOR)MAKE$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;$(MAKE) -s
+  QUIET_AR      = @printf '     %b %b\n'   $(ARCOLOR)AR$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+  QUIET_INSTALL = @printf '%b %b\n'   $(INSTALLCOLOR)INSTALL$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+else
+  QUIET_MAKE    = $(MAKE)
 endif
 

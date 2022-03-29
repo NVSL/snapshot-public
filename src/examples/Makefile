@@ -35,6 +35,8 @@ clean: clean_deps
 	$(PUDDLES_MAKE) -C simplekv_cxlbuf clean
 	$(PUDDLES_MAKE) -C simplekv_pmdk clean
 	$(PUDDLES_MAKE) -C kelly_hoh_code clean
+	$(PUDDLES_MAKE) -C map clean
+	$(PUDDLES_MAKE) -C btree clean
 	-rm -rf *.o dummy cat-demo periodic-msync
 
 include ../deps.make

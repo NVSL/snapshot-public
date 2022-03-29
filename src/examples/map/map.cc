@@ -26,6 +26,7 @@ using namespace std::chrono;
 using namespace nvsl;
 
 namespace bip = boost::interprocess;
+extern bool startTracking;
 
 bip::managed_mapped_file *tls_res;
 
@@ -157,6 +158,7 @@ int main(int argc, char *argv[]) {
                                            args.puddle_path.c_str(),
                                            MIN_POOL_SZ * 10, 
                                            (const void*)0x10000000000);
+
   tls_res = res;
   
   std::cerr << "reservoir addr = " << (void *)res << std::endl;
@@ -182,6 +184,7 @@ int main(int argc, char *argv[]) {
   }
 
   size_t op_count = 0;
+  startTracking = true;
 
   if (args.bulk) {
     perform_bulk_ops(args, root_ptr);
@@ -210,6 +213,7 @@ int main(int argc, char *argv[]) {
 
             auto arg = std::string(buf + 1);
             root_ptr->mapops->insert(root_ptr, std::stoull(arg), 0);
+            msync(res->get_address(), res->get_size(), MS_SYNC);
             break;
           }
         case 'p':
@@ -235,6 +239,7 @@ int main(int argc, char *argv[]) {
             const auto arg = std::string(buf + 1);
             const auto arg_u64 = std::stoull(arg);
             root_ptr->mapops->remove(root_ptr, arg_u64);
+            msync(res->get_address(), res->get_size(), MS_SYNC);
 
             break;
           }

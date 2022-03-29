@@ -9,6 +9,11 @@ EXTRA_LDFLAGS +=-lpthread -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR)
 
 MAPS_OBJS := ../btree/btree.o
 
+# Change CC and CXX before including common to automatically configure
+# PUDDLES_CXX and PUDDLES_CC
+export CC=../../storeinst-pass/dclang
+export CXX=../../storeinst-pass/dclang++
+
 include ../../common.make
 
 all: map
