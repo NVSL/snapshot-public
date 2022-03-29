@@ -11,19 +11,23 @@
 #include "log.hh"
 #include "nvsl/common.hh"
 #include "nvsl/envvars.hh"
+#include "nvsl/pmemops.hh"
 #include "nvsl/stats.hh"
+#include "nvsl/trace.hh"
 
 NVSL_DECL_ENV(PMEM_START_ADDR);
 NVSL_DECL_ENV(PMEM_END_ADDR);
+NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
 
 extern "C" {
   void *start_addr, *end_addr = nullptr;
-  char *log_area, *pm_back;
+  char *log_area;
   size_t current_log_off = 0;
   bool startTracking = false;
   bool storeInstEnabled = false;
   bool cxlModeEnabled = false;
-
+  nvsl::PMemOps *pmemops;
+  std::ofstream *traceStream;
   
   void init_counters() {
     skip_check_count = new nvsl::Counter();
@@ -61,11 +65,18 @@ extern "C" {
     printf("Values = %s, %s\n", start_addr_str.c_str(), end_addr_str.c_str());
   }
 
+  void init_pmemops() {
+    pmemops = new nvsl::PMemOpsClwb();
+  }
+
   __attribute__((__constructor__))
   void libstoreinst_ctor() {
     init_dlsyms();
     init_counters();
     init_addrs();
+    init_pmemops();
+
+    traceStream = new std::ofstream("/tmp/stacktrace");
 
     cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
 
@@ -87,20 +98,6 @@ extern "C" {
       perror("mmap failed");
       exit(1);
     }
-
-    const int pm_backing_fd = open("/mnt/pmem0/pm-backing", O_RDWR);
-    if (pm_backing_fd == -1) {
-      perror("open(\"/mnt/pmem0/pm-backing\") failed");
-      exit(1);
-    }
-
-    pm_back = (char*)real_mmap(NULL, 1024*1024*1024, PROT_READ | PROT_WRITE,
-                               MAP_SYNC | MAP_SHARED_VALIDATE, pm_backing_fd, 0);
-
-    if (pm_back == (char*)-1) {
-      perror("mmap(pm_backing_fd) failed");
-      exit(1);
-    }
   
     printf("Mounted log area at %p\n", (void*)log_area);
   }
@@ -110,6 +107,11 @@ extern "C" {
     if (startTracking) {
       if (start_addr < ptr and ptr < end_addr) {
         log_range(ptr, 8);
+#ifndef RELEASE
+        if (get_env_val(ENABLE_CHECK_MEMORY_TRACING_ENV)) {
+          *traceStream << "-----\n" << nvsl::get_stack_trace() << "\n\n";
+        }
+#endif
       } else {
         ++*skip_check_count;
       }

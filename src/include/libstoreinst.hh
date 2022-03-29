@@ -12,6 +12,9 @@
 
 #define BUF_SIZE (100 * 1000 * 4096)
 
+namespace nvsl {
+  class PMemOps;
+}
 
 extern "C" {
   void *memcpy(void *__restrict dst, const void *__restrict src, size_t n)
@@ -31,4 +34,5 @@ extern "C" {
   extern bool startTracking;
   extern bool storeInstEnabled;
   extern bool cxlModeEnabled;
+  extern nvsl::PMemOps *pmemops;
 }

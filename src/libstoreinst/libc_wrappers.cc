@@ -4,15 +4,21 @@
 #include "libstoreinst.hh"
 #include "log.hh"
 #include "nvsl/common.hh"
+#include "nvsl/pmemops.hh"
 #include "nvsl/string.hh"
 #include "utils.hh"
 
 #include <cassert>
 #include <dlfcn.h>
+#include <filesystem>
 #include <numeric>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <unordered_map>
+
+namespace fs = std::filesystem;
+
+using namespace nvsl;
 
 typedef void *(*memcpy_sign)(void *, const void *, size_t);
 typedef void *(*mmap_sign)(void *, size_t, int, int, int, __off_t);
@@ -25,7 +31,8 @@ typedef int (*msync_sign)(void *addr, size_t length, int flags);
 
 void *(*real_memcpy)(void *, const void *, size_t) = nullptr;
 void *(*real_memmove)(void *, const void *, size_t) = nullptr;
-void *(*real_mmap)(void *, size_t, int, int, int, __off_t) = nullptr;
+void *(*real_mmap)(void *__addr, size_t __len, int __prot, int __flags, int __fd,
+                   __off_t __offset) = nullptr;
 void *(*real_mremap)(void *__addr, size_t __old_len, size_t __new_len,
                      int __flags, ...) = nullptr;
 int (*real_munmap)(void *__addr, size_t __len) = nullptr;
@@ -133,7 +140,7 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
     exit(1);
   }
 
-  DBGH(3) << "Mmaped fd " << __fd << " to path " << nvsl::S(buf) << std::endl;
+  DBGH(3) << "Mmaped fd " << __fd << " to path " << S(buf) << std::endl;
 
   if (mmap_start == nullptr) {
     mmap_start = start_addr;
@@ -141,13 +148,37 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   }
 
   // Check if the mmaped file is in /mnt/pmem0/
-  if (nvsl::is_prefix("/mnt/pmem0/", buf)) {
+  if (is_prefix("/mnt/pmem0/", buf)) {
     DBGH(1) << "Changing mmap address from " << __addr << " to " << mmap_start
             << std::endl;
     __addr = mmap_start;
 
     /* mmap needs aligned address */
     mmap_start = (char*)mmap_start + ((__len+4095)/4096)*4096;
+
+    /* Since this file is opened in the PM, create a corresponding backing file
+       and map it at +0x10000000000 */
+    const fs::path bck_fname = S(buf) + S(".cxlbuf_backing");
+
+    if (fs::exists(bck_fname)) {
+      fs::remove_all(bck_fname);
+    }
+    
+    fs::copy_file(S(buf), bck_fname);
+
+    void *bck_addr = (char*)__addr + 0x10000000000;
+    const int bck_fd = open(bck_fname.c_str(), O_RDWR);
+    const int bck_flags = MAP_SHARED_VALIDATE | MAP_SYNC | MAP_FIXED_NOREPLACE;
+    const void *mbck_addr = real_mmap(bck_addr, __len, bck_flags,
+                                      PROT_READ | PROT_WRITE, bck_fd, 0);
+
+    if (mbck_addr == (void*)-1) {
+      DBGE << "Unable to map backing file" << std::endl;
+      exit(1);
+    } else {
+      DBGH(2) << "Backing file " << bck_fname << " for " << fs::path(buf)
+              << " mapped at address " << mbck_addr << std::endl;
+    }
   }
 
   /* Add map fixed no replace to prevent kernel from mapping it outside the
@@ -274,6 +305,8 @@ int fdatasync (int __fildes) {
 
 __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
+  char *pm_back = (char*)0x20000000000;
+  
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
   if (storeInstEnabled) {
@@ -284,32 +317,39 @@ int snapshot(void *addr, size_t bytes, int flags) {
     size_t bytes_flushed = 0;
     for (size_t i = 0; i < current_log_off;) {
       auto &log_entry = *(log_t*)((char*)log + i);
-      
-      if (log_entry.addr != 0 and log_entry.addr < (uint64_t)addr + bytes
+
+      /* Copy the logged location to the backing store if in range of
+         snapshot */
+      if (log_entry.addr < (uint64_t)addr + bytes
           and log_entry.addr >= (uint64_t)addr) {
+
         const size_t offset = log_entry.addr - (uint64_t)start_addr;
         const size_t dst_addr = (size_t)(pm_back + offset);
+        
+        DBGH(4) << "Copying " << log_entry.bytes << " bytes from "
+                << (void*)log_entry.addr << " -> " << (void*)dst_addr
+                << std::endl;
 
-        *(uint64_t*)dst_addr = *(uint64_t*)log_entry.addr;
+        real_memcpy((void*)dst_addr, (void*)log_entry.addr, log_entry.bytes);
+        pmemops->flush((void*)dst_addr, log_entry.bytes);
 
         log_entry.addr = 0;
-
-        
-        _mm_clwb((void*)dst_addr);
       } else if (log_entry.addr == 0) {
         break;
       }
 
       bytes_flushed += log_entry.bytes;
       total_proc++;
+
       i += sizeof(log_t) + log_entry.bytes;
-      DBGH(4) << "Entry size: " << log_entry.bytes << std::endl;
     }
+
     DBGH(4) << "total_proc = " << total_proc << "\n";
     DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
     
     tx_log_count_dist->add(total_proc);
-    _mm_sfence();
+
+    pmemops->drain();
       
   } else {
     DBGH(1) << "Calling real msync" << std::endl;

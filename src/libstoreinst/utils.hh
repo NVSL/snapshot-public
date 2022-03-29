@@ -6,4 +6,6 @@
  * @brief  Brief description here
  */
 
+#pragma once
+
 bool addr_in_range(void *addr);
