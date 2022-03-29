@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -10,7 +10,13 @@ EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
 include ../common.make
 
-all: dummy cat-demo periodic-msync simplekv_cxlbuf simplekv_pmdk
+all: dummy cat-demo periodic-msync simplekv_cxlbuf simplekv_pmdk map btree
+
+map: btree
+	$(PUDDLES_MAKE) -C map
+
+btree:
+	$(PUDDLES_MAKE) -C btree
 
 simplekv_cxlbuf simplekv_pmdk:
 	$(PUDDLES_MAKE) -C $@

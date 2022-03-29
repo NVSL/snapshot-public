@@ -1,6 +1,8 @@
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 DEPS_DIR := .deps
+ROOT_DIR := $(realpath $(dir $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))..)/
 
+include $(SELF_DIR)vars.make
 include $(SELF_DIR)colors.make
 
 ifdef RELEASE
@@ -23,6 +25,9 @@ LINKFLAGS   :=$(EXTRA_LINKFLAGS)
 INCLUDE     +=-iquote$(SELF_DIR)include
 INCLUDE     +=-iquote$(SELF_DIR)
 INCLUDE     +=-iquote$(SELF_DIR)../vendor/cpp-common/include
+INCLUDE     +=-I$(BOOST_INTERPROCESS_PATH)
+INCLUDE     +=-I$(BOOST_MOVE_PATH)
+INCLUDE     +=-I$(BOOST_CONFIG_PATH)
 
 ifdef RELEASE
 CXXFLAGS    +=-DRELEASE

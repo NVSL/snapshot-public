@@ -10,7 +10,6 @@ check_compiler:
 
 .so_deps:
 	@$(MAKE) -s check_so_libuuid PERFORM_CHECKS=0
-	@$(MAKE) -s check_so_libboost_system PERFORM_CHECKS=0
 	@touch .so_deps
 
 check_so_%:
@@ -21,3 +20,4 @@ check_so_%:
 		printf "not found.\n\nInstall  $(@:check_so_%=%.so)\n";\
 		exit 1;\
 	fi
+

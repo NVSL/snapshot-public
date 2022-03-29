@@ -32,7 +32,9 @@ extern "C" {
 
     skip_check_count->init("skip_check_count", "Skipped memory checks");
     logged_check_count->init("logged_check_count", "Logged memory checks");
-    tx_log_count_dist->init("tx_log_count_dist", "Distribution of number of logs in a transaction", 5, 0, 30);
+    tx_log_count_dist->init("tx_log_count_dist", 
+                            "Distribution of number of logs in a transaction",
+                            5, 0, 30);
   }
 
   void init_addrs() {
@@ -93,7 +95,7 @@ extern "C" {
     }
 
     pm_back = (char*)real_mmap(NULL, 1024*1024*1024, PROT_READ | PROT_WRITE,
-                          MAP_SYNC | MAP_SHARED_VALIDATE, pm_backing_fd, 0);
+                               MAP_SYNC | MAP_SHARED_VALIDATE, pm_backing_fd, 0);
 
     if (pm_back == (char*)-1) {
       perror("mmap(pm_backing_fd) failed");
@@ -111,7 +113,7 @@ extern "C" {
       } else {
         ++*skip_check_count;
       }
-      }
+    }
   }
 
   __attribute__((destructor))
