@@ -8,22 +8,14 @@ LIBS_DIR := $(shell readlink -f $(DIR)../../lib)
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
+SUBDIRS := simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx kelly_hoh_code
+
 include ../common.make
 
-all: dummy cat-demo periodic-msync simplekv_cxlbuf simplekv_pmdk map btree \
-	linkedlist_tx
+all: dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) map
 
-map: btree
+map: btree_subdir
 	$(PUDDLES_MAKE) -C map
-
-btree:
-	$(PUDDLES_MAKE) -C btree
-
-linkedlist_tx:
-	$(PUDDLES_MAKE) -C linkedlist_tx
-
-simplekv_cxlbuf simplekv_pmdk:
-	$(PUDDLES_MAKE) -C $@
 
 dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
@@ -34,14 +26,14 @@ cat-demo: cat-demo.o
 periodic-msync: periodic-msync.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
+%_subdir:
+	$(PUDDLES_MAKE) -C $(subst _subdir,,$@)
 
-clean: clean_deps 
-	$(PUDDLES_MAKE) -C simplekv_cxlbuf clean
-	$(PUDDLES_MAKE) -C simplekv_pmdk clean
-	$(PUDDLES_MAKE) -C kelly_hoh_code clean
-	$(PUDDLES_MAKE) -C map clean
-	$(PUDDLES_MAKE) -C linkedlist_tx clean
-	$(PUDDLES_MAKE) -C btree clean
+%_subdir_clean:
+	$(PUDDLES_MAKE) -C $(subst _subdir_clean,,$@) clean
+
+
+clean: clean_deps map_subdir_clean $(addsuffix _subdir_clean,$(SUBDIRS))
 	-rm -rf *.o dummy cat-demo periodic-msync
 
 include ../deps.make

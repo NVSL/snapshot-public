@@ -14,9 +14,15 @@ namespace dsa {
   const uint64_t QSIZE = 1024;
 
   struct jobdesc_t {
+    enum flags_t {
+      FLUSH = 1, // Flush the changes using clwb
+      DRAIN = 2, // Drain after writing
+    };
+
     addr_t src;
     addr_t dst;
     size_t bytes;
+    flags_t flags;
   };
 
   extern size_t queue_head, queue_tail;
