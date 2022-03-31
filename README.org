@@ -2,3 +2,6 @@
 
 ** Dependencies
 - Boost.Interprocess (included)
+- Boost.Config (included)
+- Boost.Move (included)
+- nvsl.cpp-common (included)
