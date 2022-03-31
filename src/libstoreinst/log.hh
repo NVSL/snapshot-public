@@ -26,6 +26,11 @@ struct log_t {
   NVSL_END_IGNORE_WPEDANTIC
 };
 
+struct log_lean_t {
+  uint64_t addr;
+  uint64_t bytes;
+};
+
 void log_range(void *start, size_t bytes);
 
 extern nvsl::Counter *skip_check_count, *logged_check_count;

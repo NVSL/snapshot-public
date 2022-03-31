@@ -10,7 +10,7 @@
 
 #include <unistd.h>
 
-#define BUF_SIZE (100 * 1000 * 4096)
+#define BUF_SIZE (100 * 1000 * 4096UL)
 
 namespace nvsl {
   class PMemOps;
@@ -29,8 +29,8 @@ extern "C" {
   void libstoreinst_ctor();
 
   extern void *start_addr, *end_addr;
-  extern char *log_area, *pm_back;
-  extern size_t current_log_off;
+  extern char *log_area, *addr_area, *pm_back;
+  extern size_t current_log_off, current_log_cnt;
   extern bool startTracking;
   extern bool storeInstEnabled;
   extern bool cxlModeEnabled;

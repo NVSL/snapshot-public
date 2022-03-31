@@ -52,6 +52,7 @@ void *mmap_start = nullptr;
 
 void init_dlsyms() {
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
+  printf("dlsym for memcpy = %p at %p\n", (void*)real_memcpy, (void*)&real_memcpy);
   if (real_memcpy == nullptr) {
     DBGE << "dlsym failed for memcpy: %s\n" << std::string(dlerror()) << "\n";
     exit(1);
@@ -172,6 +173,11 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
     const void *mbck_addr = real_mmap(bck_addr, __len, bck_flags,
                                       PROT_READ | PROT_WRITE, bck_fd, 0);
 
+    std::cerr << "Call to mmap for backing file: mmap(" << bck_addr << ", " << __len
+              << ", MAP_SHARED_VALIDATE | MAP_SYNC | MAP_FIXED_NOREPLACE, PROT_READ | PROT_WRITE, " << bck_fd << ", "
+              << ", o)" << std::endl;
+
+    
     if (mbck_addr == (void*)-1) {
       DBGE << "Unable to map backing file" << std::endl;
       exit(1);
@@ -182,8 +188,9 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   }
 
   /* Add map fixed no replace to prevent kernel from mapping it outside the
-     tracking space */
+     tracking space and remove the MAP_SYNC flag */
   __flags |= MAP_FIXED_NOREPLACE;
+  __flags &= ~MAP_SYNC;
   
   std::vector<std::string> flags;
   if (__flags & MAP_SHARED) {
@@ -221,7 +228,7 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   const auto prot_str = nvsl::zip(prot, " | ");
 
 
-  DBGH(3) << "Call to mmap intercepted: mmap(" << __addr << ", " << __len
+  std::cerr << "Call to mmap intercepted: mmap(" << __addr << ", " << __len
           << ", " << prot_str << ", " << flags_str << ", " << __fd << ", "
           << nvsl::S(buf) << ", " << __offset << std::endl;
 
@@ -235,6 +242,8 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
 
     if (not addr_in_range(result)) {
       DBGE << "Cannot map pmem file in range" << std::endl;
+      DBGE << "Asked " << __addr << ", got " << result << std::endl;
+      perror("mmap:");
       system(("cat /proc/" + std::to_string(getpid()) + "/maps >&2").c_str());
       exit(1);
     }
@@ -306,45 +315,60 @@ int fdatasync (int __fildes) {
 __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
   char *pm_back = (char*)0x20000000000;
+
+  // TODO: Use better names
+
+  /* Drain all the stores to the log before modifying the backing file */
+  pmemops->drain();
   
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
-  if (storeInstEnabled) {
+  if (storeInstEnabled) [[likely]] {
     DBGH(1) << "Calling snapshot (not msync)" << std::endl;
 
-    auto log = (log_t*)log_area;
+    // auto log = (log_t*)log_area;
+    auto addr_arr = (log_lean_t*)addr_area;
+
     size_t total_proc = 0;
     size_t bytes_flushed = 0;
-    for (size_t i = 0; i < current_log_off;) {
-      auto &log_entry = *(log_t*)((char*)log + i);
+    size_t start = (uint64_t)addr, end = (uint64_t)addr+bytes;
+    size_t diff = end - start;
 
+    for (size_t log_i = 0; log_i < current_log_cnt; log_i++) {
+      auto entry_addr = *(addr_arr + log_i);
       /* Copy the logged location to the backing store if in range of
          snapshot */
-      if (log_entry.addr < (uint64_t)addr + bytes
-          and log_entry.addr >= (uint64_t)addr) {
-
-        const size_t offset = log_entry.addr - (uint64_t)start_addr;
+      // if (log_entry.addr < end and log_entry.addr >= start) [[likely]] {
+      if (entry_addr.addr-start <= diff) [[likely]] {
+        const size_t offset = entry_addr.addr - (uint64_t)start_addr;
         const size_t dst_addr = (size_t)(pm_back + offset);
         
-        DBGH(4) << "Copying " << log_entry.bytes << " bytes from "
-                << (void*)log_entry.addr << " -> " << (void*)dst_addr
+        DBGH(4) << "Copying " << entry_addr.bytes << " bytes from "
+                << (void*)entry_addr.addr << " -> " << (void*)dst_addr
                 << std::endl;
 
-        real_memcpy((void*)dst_addr, (void*)log_entry.addr, log_entry.bytes);
-        pmemops->flush((void*)dst_addr, log_entry.bytes);
+        if (entry_addr.bytes > 64) {
+          real_memcpy((void*)dst_addr, (void*)entry_addr.addr, entry_addr.bytes);
+          pmemops->flush((void*)dst_addr, entry_addr.bytes);
+        } else {
+          pmemops->streaming_wr((void*)dst_addr, (void*)entry_addr.addr,
+                                entry_addr.bytes);
+        }
 
-        log_entry.addr = 0;
-      } else if (log_entry.addr == 0) {
+        // log_entry.addr = 0;
+        entry_addr.addr = 0;
+      } else if (entry_addr.addr == 0) {
         break;
       }
 
-      bytes_flushed += log_entry.bytes;
+      bytes_flushed += entry_addr.bytes;
       total_proc++;
 
-      i += sizeof(log_t) + log_entry.bytes;
+      // i += sizeof(log_t) + entry_addr.bytes;
     }
 
     DBGH(4) << "total_proc = " << total_proc << "\n";
+    // fprintf(stderr, "total proc = %lu\n", total_proc);
     DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
     
     tx_log_count_dist->add(total_proc);
@@ -365,6 +389,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
     }
   }
   current_log_off = 0;
+  current_log_cnt = 0;
   return 0;
 }
 

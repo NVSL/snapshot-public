@@ -35,7 +35,7 @@ def main(fname):
         target = cxx
 
     args = sys.argv[1:]
-    pass_args = []
+    pass_args = ['-frecord-command-line']
 
     if 'DCLANG_LIBS_DIR' in os.environ:
         libs_dir = os.environ['DCLANG_LIBS_DIR']
@@ -47,13 +47,21 @@ def main(fname):
         pass_args += ['-fexperimental-new-pass-manager',
                       '-fpass-plugin=' + PASS_SO,
                       '-ldl',
-                      '-lstoreinst',
                       '-Wno-unused-command-line-argument']
-    else:
+    if 'DCLANG_DONT_LINK' not in os.environ:
         pass_args += ['-ldl',
                       '-lstoreinst']
+    else:
+        pass_args += []
 
-    ret = subprocess.call([target] + pass_args + args)
+    cmd = [target] + pass_args + args
+        
+    if 'V' in os.environ:
+        print("----")
+        print(" ".join(cmd))
+        print("----")
+        
+    ret = subprocess.call(cmd)
     sys.exit(ret)
 
 

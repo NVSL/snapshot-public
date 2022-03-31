@@ -1,13 +1,16 @@
 // -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
 
 #include "../list.hh"
+#include "libstoreinst.hh"
 #include "nvsl/clock.hh"
 #include "nvsl/common.hh"
 #include "nvsl/common.impl.hh"
 #include "nvsl/stats.hh"
 
 #include <boost/interprocess/creation_tags.hpp>
+#include <boost/interprocess/indexes/iset_index.hpp>
 #include <boost/interprocess/interprocess_fwd.hpp>
+#include <boost/interprocess/sync/mutex_family.hpp>
 #include <chrono>
 #include <cstring>
 #include <exception>
@@ -69,7 +72,7 @@ args_t parse_args(std::vector<std::string> args_v) {
 }
 
 
-void append_node(bip::managed_mapped_file *res, linkedlist_t *ll_obj,
+void append_node(mmf *res, linkedlist_t *ll_obj,
                  uint64_t val, bool exit_mid_tx = false) {
   // TX_BEGIN(res) {
     // TX_ADD(ll_obj);
@@ -144,12 +147,12 @@ void print_nodes(linkedlist_t *ll_obj) {
   std::cout << std::endl;
 }
 
-void package_reservoir(bip::managed_mapped_file *res, const std::string &path,
+void package_reservoir(mmf *res, const std::string &path,
                        const std::string &pkg_type_str) {
   NVSL_ASSERT(false, "Unimplemented");
 }
 
-void pop_head(bip::managed_mapped_file *res, linkedlist_t *ll_obj) {
+void pop_head(mmf *res, linkedlist_t *ll_obj) {
   // TX_BEGIN(res) {
     if (ll_obj->head == nullptr) {
       // std::cout << "list empty" << std::endl;
@@ -173,7 +176,7 @@ void pop_head(bip::managed_mapped_file *res, linkedlist_t *ll_obj) {
     msync(res->get_address(), res->get_size(), MS_SYNC);
 }
 
-void bulk_append_nodes(bip::managed_mapped_file *res, linkedlist_t *ll_obj,
+void bulk_append_nodes(mmf *res, linkedlist_t *ll_obj,
                        const uint64_t cnt) {
   Clock clk;
   clk.tick();
@@ -186,7 +189,7 @@ void bulk_append_nodes(bip::managed_mapped_file *res, linkedlist_t *ll_obj,
   std::cout << clk.summarize(cnt) << std::endl;
 }
 
-void bulk_append_delete_nodes(bip::managed_mapped_file *res, linkedlist_t *ll_obj,
+void bulk_append_delete_nodes(mmf *res, linkedlist_t *ll_obj,
                               const uint64_t cnt, const double ratio = 1) {
   Clock clk;
   clk.tick();
@@ -204,7 +207,7 @@ void bulk_append_delete_nodes(bip::managed_mapped_file *res, linkedlist_t *ll_ob
   std::cout << clk.summarize(cnt) << std::endl;
 }
 
-void bulk_delete_nodes(bip::managed_mapped_file *res, linkedlist_t *ll_obj,
+void bulk_delete_nodes(mmf *res, linkedlist_t *ll_obj,
                        const uint64_t cnt) {
   Clock clk;
   clk.tick();
@@ -236,25 +239,17 @@ size_t sum_nodes(const linkedlist_t *ll_obj) {
 }
 
 int main(int argc, char *argv[]) {
-#ifdef ENABLED_FLAG_EXAMPLE
-  assert(1);
-  printf("ENABLED_FLAG_EXAMPLE enabled\n");
-#endif
-
-#ifdef DISABLED_FLAG_EXAMPLE
-  assert(0);
-#endif
-  
   // register_filt_fun(typeid(node_t), node_t::filter);
   // register_filt_fun(typeid(linkedlist_t), linkedlist_t::filter);
 
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
+  printf("Started\n");
 
-  auto res = new bip::managed_mapped_file(bip::open_or_create,
-                                          args.puddle_path.c_str(),
-                                          MIN_POOL_SZ*10);
+  auto res = new mmf(bip::open_or_create, args.puddle_path.c_str(),
+                     MIN_POOL_SZ*1000);
   // reservoir_t *res =
       // new reservoir_t(libpuddles::MIN_POOL_SZ * 10, args.puddle_path.c_str());
+
 
   auto root_ptr = res->find<linkedlist_t>("root").first;
 

@@ -22,7 +22,9 @@ NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
 extern "C" {
   void *start_addr, *end_addr = nullptr;
   char *log_area;
+  char *addr_area;
   size_t current_log_off = 0;
+  size_t current_log_cnt = 0;
   bool startTracking = false;
   bool storeInstEnabled = false;
   bool cxlModeEnabled = false;
@@ -89,13 +91,22 @@ extern "C" {
       perror("open failed");
       exit(1);
     }
-  
-    log_area = (char*)real_mmap((char*)end_addr-(BUF_SIZE*2), BUF_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
+    
+    fprintf(stderr, "%p +%lu\n", (void*)((char*)end_addr+(BUF_SIZE*2)), 2*BUF_SIZE);
+    log_area = (char*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
+                                MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
 
     if (log_area == (char*)-1) {
       perror("mmap failed");
+      exit(1);
+    }
+
+    lseek(fd, 0, SEEK_SET);
+    addr_area = (char*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE, 0, BUF_SIZE);
+
+    if (addr_area == (char*)-1) {
+      perror("addr_area mmap failed");
       exit(1);
     }
   

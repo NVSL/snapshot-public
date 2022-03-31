@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    auto start_addr = nullptr;
-    auto addr = mmap(start_addr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE,
-                    MAP_SHARED_VALIDATE | MAP_FIXED, fd, 0);
+    // auto start_addr = nullptr;
+    auto addr = mmap(nullptr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE,
+                    MAP_SHARED, fd, 0);
 
     std::cout << "mounted at " << (void*)addr << std::endl;
 
