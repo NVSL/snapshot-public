@@ -184,9 +184,14 @@ class Fig(object):
 
         return self
 
-    def add_bar_labels(self, mask):
+    def add_bar_labels(self, mask, fontsize=None):
         rects = self.ax.patches
         mask_full = mask
+        
+        label_fontsize = Fig.fontsize_gbl-2
+        
+        if fontsize:
+            label_fontsize = fontsize
 
         if len(rects)%len(mask) != 0:
             raise Exception("Bars in the axis must be a multiple of mask length")
@@ -207,7 +212,7 @@ class Fig(object):
             label = round(height, 1)
             self.ax.text(
                 rect.get_x() + rect.get_width() / 2, 3, f"{label}x", ha="center", va="bottom",
-                fontsize=Fig.fontsize_gbl-1
+                fontsize=label_fontsize
             )
 
         return self

@@ -16,6 +16,7 @@
 #include "common.hh"
 #include "libstoreinst.hh"
 #include "nvsl/clock.hh"
+#include "nvsl/string.hh"
 
 #include "simplekv_puddles.hh"
 
@@ -50,26 +51,9 @@ int main(int argc, char *argv[]) {
   const char *path = argv[1];
 
   try {
-    auto fd = open(path, O_RDWR);
-    if (fd == -1) {
-      perror("open failed");
-      exit(1);
-    }
+    auto res = new reservoir_t(nvsl::S(path), MIN_POOL_SZ*10);
 
-    // auto start_addr = nullptr;
-    auto addr = mmap(nullptr, MIN_POOL_SZ * 10, PROT_READ | PROT_WRITE,
-                    MAP_SHARED, fd, 0);
-
-    std::cout << "mounted at " << (void*)addr << std::endl;
-
-    if (addr == (void*)-1) {
-      perror("mmap failed");
-      exit(1);
-    }
-
-    auto res = new reservoir_t(addr, MIN_POOL_SZ*10);
-
-    auto root = res->malloc<kv_type>();
+    auto root = res->allocate_root<kv_type>();
 
     std::cout << "Root at " << (void*)root << std::endl;
     root->init(res, MIN_POOL_SZ*10);
