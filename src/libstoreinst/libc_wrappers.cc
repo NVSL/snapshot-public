@@ -6,6 +6,8 @@
 #include "nvsl/common.hh"
 #include "nvsl/pmemops.hh"
 #include "nvsl/string.hh"
+#include "nvsl/utils.hh"
+#include "recovery.hh"
 #include "utils.hh"
 
 #include <cassert>
@@ -14,12 +16,11 @@
 #include <numeric>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <unordered_map>
 
 namespace fs = std::filesystem;
-
 using namespace nvsl;
 
+/*-- LIBC functions BEGIN --*/
 typedef void *(*memcpy_sign)(void *, const void *, size_t);
 typedef void *(*mmap_sign)(void *, size_t, int, int, int, __off_t);
 typedef void *(*mremap_sign)(void *__addr, size_t __old_len, size_t __new_len,
@@ -40,17 +41,15 @@ void (*real_sync)(void) = nullptr;
 int (*real_fsync)(int) = nullptr;
 int (*real_fdatasync)(int) = nullptr;
 int (*real_msync)(void *addr, size_t length, int flags);
+/*-- LIBC functions END --*/
 
-/* Map from file descriptor to mapped address range */
-struct addr_range_t {
-  size_t start;
-  size_t end;
-};
-std::unordered_map<int, addr_range_t> mapped_addr;
+/** @brief Map from file descriptor to mapped address range **/
+std::unordered_map<int, cxlbuf::addr_range_t> cxlbuf::mapped_addr;
 
-void *mmap_start = nullptr;
+/** @brief Bump allocator for the START_ADDR -> END_ADDR mmap tracking space **/
+void *cxlbuf::mmap_start = nullptr;
 
-void init_dlsyms() {
+void cxlbuf::init_dlsyms() {
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
   printf("dlsym for memcpy = %p at %p\n", (void*)real_memcpy, (void*)&real_memcpy);
   if (real_memcpy == nullptr) {
@@ -110,7 +109,7 @@ void init_dlsyms() {
 extern "C" {
 void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) __THROW {
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
-    log_range(dst, n);
+    tls_log.log_range(dst, n);
   }
 
   return real_memcpy(dst, src, n);
@@ -120,7 +119,7 @@ void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
   __THROW {
   bool memmove_logged = false;
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
-    log_range(dst, n);
+    tls_log.log_range(dst, n);
     memmove_logged = true;
   }
   
@@ -143,114 +142,34 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
 
   DBGH(3) << "Mmaped fd " << __fd << " to path " << S(buf) << std::endl;
 
-  if (mmap_start == nullptr) {
-    mmap_start = start_addr;
-    assert(mmap_start != nullptr);
+  if (cxlbuf::mmap_start == nullptr) {
+    cxlbuf::mmap_start = start_addr;
+    assert(cxlbuf::mmap_start != nullptr);
   }
+
+  cxlbuf::PmemFile pmemf(S(buf), __addr, __len);
 
   // Check if the mmaped file is in /mnt/pmem0/
   if (is_prefix("/mnt/pmem0/", buf)) {
-    DBGH(1) << "Changing mmap address from " << __addr << " to " << mmap_start
-            << std::endl;
-    __addr = mmap_start;
+    DBGH(1) << "Changing mmap address from " << __addr << " to "
+            << cxlbuf::mmap_start << std::endl;
+    __addr = cxlbuf::mmap_start;
 
     /* mmap needs aligned address */
-    mmap_start = (char*)mmap_start + ((__len+4095)/4096)*4096;
+    cxlbuf::mmap_start = (char*)cxlbuf::mmap_start + ((__len+4095)/4096)*4096;
 
-    /* Since this file is opened in the PM, create a corresponding backing file
-       and map it at +0x10000000000 */
-    const fs::path bck_fname = S(buf) + S(".cxlbuf_backing");
 
-    if (fs::exists(bck_fname)) {
-      fs::remove_all(bck_fname);
-    }
-    
-    fs::copy_file(S(buf), bck_fname);
+    pmemf.set_addr(__addr);
+    pmemf.create_backing_file();
+    pmemf.map_backing_file();
+  }  
 
-    void *bck_addr = (char*)__addr + 0x10000000000;
-    const int bck_fd = open(bck_fname.c_str(), O_RDWR);
-    const int bck_flags = MAP_SHARED_VALIDATE | MAP_SYNC | MAP_FIXED_NOREPLACE;
-    const void *mbck_addr = real_mmap(bck_addr, __len, bck_flags,
-                                      PROT_READ | PROT_WRITE, bck_fd, 0);
+  DBGH(1) << "Call to mmap intercepted: "
+          << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
+          << std::endl;
 
-    std::cerr << "Call to mmap for backing file: mmap(" << bck_addr << ", " << __len
-              << ", MAP_SHARED_VALIDATE | MAP_SYNC | MAP_FIXED_NOREPLACE, PROT_READ | PROT_WRITE, " << bck_fd << ", "
-              << ", o)" << std::endl;
-
-    
-    if (mbck_addr == (void*)-1) {
-      DBGE << "Unable to map backing file" << std::endl;
-      exit(1);
-    } else {
-      DBGH(2) << "Backing file " << bck_fname << " for " << fs::path(buf)
-              << " mapped at address " << mbck_addr << std::endl;
-    }
-  }
-
-  /* Add map fixed no replace to prevent kernel from mapping it outside the
-     tracking space and remove the MAP_SYNC flag */
-  __flags |= MAP_FIXED_NOREPLACE;
-  __flags &= ~MAP_SYNC;
+  void *result = pmemf.map_to_page_cache(__flags, __prot, __fd, __offset);
   
-  std::vector<std::string> flags;
-  if (__flags & MAP_SHARED) {
-    flags.push_back("MAP_SHARED");
-  }
-  if (__flags & MAP_PRIVATE) {
-    flags.push_back("MAP_PRIVATE");
-  }
-  if (__flags & MAP_ANONYMOUS) {
-    flags.push_back("MAP_ANONYMOUS");
-  }
-  if (__flags & MAP_FIXED) {
-    flags.push_back("MAP_FIXED");
-  }
-  if (__flags & MAP_FIXED_NOREPLACE) {
-    flags.push_back("MAP_FIXED_NOREPLACE");
-  }
-  if (__flags & MAP_SYNC) {
-    flags.push_back("MAP_SYNC");
-  }
-
-  const auto flags_str = nvsl::zip(flags, " | ");
-
-  std::vector<std::string> prot;
-  if (__prot & PROT_READ) {
-    prot.push_back("PROT_READ");
-  }
-  if (__prot & PROT_WRITE) {
-    prot.push_back("PROT_WRITE");
-  }
-  if (__prot & PROT_EXEC) {
-    prot.push_back("PROT_EXEC");
-  }
-
-  const auto prot_str = nvsl::zip(prot, " | ");
-
-
-  std::cerr << "Call to mmap intercepted: mmap(" << __addr << ", " << __len
-          << ", " << prot_str << ", " << flags_str << ", " << __fd << ", "
-          << nvsl::S(buf) << ", " << __offset << std::endl;
-
-  void *result = real_mmap(__addr, __len, __prot, __flags, __fd, __offset);
-
-  if (result != nullptr) {
-    const addr_range_t val = {(size_t)(__addr), (size_t)((char*)__addr + __len)};
-    mapped_addr.insert_or_assign(__fd, val);
-    DBGH(2) << "mmap_addr recorded " << __fd << " -> " << (void*)val.start
-            << (void*)val.end << std::endl;
-
-    if (not addr_in_range(result)) {
-      DBGE << "Cannot map pmem file in range" << std::endl;
-      DBGE << "Asked " << __addr << ", got " << result << std::endl;
-      perror("mmap:");
-      system(("cat /proc/" + std::to_string(getpid()) + "/maps >&2").c_str());
-      exit(1);
-    }
-  } else {
-    DBGW << "Call to mmap failed" << std::endl;
-  }
-
   return result;
 }
   
@@ -291,10 +210,11 @@ void *mremap (void *__addr, size_t __old_len, size_t __new_len,
 
 int fdatasync (int __fildes) {
   int result = 0;
-  const bool addr_mapped = mapped_addr.find(__fildes) != mapped_addr.end();
-  addr_range_t range = {};
+  const bool addr_mapped
+    = cxlbuf::mapped_addr.find(__fildes) != cxlbuf::mapped_addr.end();
+  cxlbuf::addr_range_t range = {};
   if (addr_mapped) {
-    range = mapped_addr[__fildes];
+    range = cxlbuf::mapped_addr[__fildes];
   }
 
   DBGH(3) << "Call to fdatasync intercepted: fdatasync(" << __fildes << "=["
@@ -316,8 +236,6 @@ __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
   char *pm_back = (char*)0x20000000000;
 
-  // TODO: Use better names
-
   /* Drain all the stores to the log before modifying the backing file */
   pmemops->drain();
   
@@ -326,52 +244,43 @@ int snapshot(void *addr, size_t bytes, int flags) {
   if (storeInstEnabled) [[likely]] {
     DBGH(1) << "Calling snapshot (not msync)" << std::endl;
 
-    // auto log = (log_t*)log_area;
-    auto addr_arr = (log_lean_t*)addr_area;
-
     size_t total_proc = 0;
     size_t bytes_flushed = 0;
     size_t start = (uint64_t)addr, end = (uint64_t)addr+bytes;
     size_t diff = end - start;
 
-    for (size_t log_i = 0; log_i < current_log_cnt; log_i++) {
-      auto entry_addr = *(addr_arr + log_i);
+    for (auto &entry : tls_log.entries) {
       /* Copy the logged location to the backing store if in range of
          snapshot */
-      // if (log_entry.addr < end and log_entry.addr >= start) [[likely]] {
-      if (entry_addr.addr-start <= diff) [[likely]] {
-        const size_t offset = entry_addr.addr - (uint64_t)start_addr;
+      if (entry.addr - start <= diff) [[likely]] {
+        const size_t offset = entry.addr - (uint64_t)start_addr;
         const size_t dst_addr = (size_t)(pm_back + offset);
         
-        DBGH(4) << "Copying " << entry_addr.bytes << " bytes from "
-                << (void*)entry_addr.addr << " -> " << (void*)dst_addr
+        DBGH(4) << "Copying " << entry.bytes << " bytes from "
+                << (void*)entry.addr << " -> " << (void*)dst_addr
                 << std::endl;
 
-        if (entry_addr.bytes > 64) {
-          real_memcpy((void*)dst_addr, (void*)entry_addr.addr, entry_addr.bytes);
-          pmemops->flush((void*)dst_addr, entry_addr.bytes);
+        if (entry.bytes > 64) {
+          real_memcpy((void*)dst_addr, (void*)entry.addr, entry.bytes);
+          pmemops->flush((void*)dst_addr, entry.bytes);
         } else {
-          pmemops->streaming_wr((void*)dst_addr, (void*)entry_addr.addr,
-                                entry_addr.bytes);
+          pmemops->streaming_wr((void*)dst_addr, (void*)entry.addr,
+                                entry.bytes);
         }
 
-        // log_entry.addr = 0;
-        entry_addr.addr = 0;
-      } else if (entry_addr.addr == 0) {
+        entry.addr = 0;
+      } else if (entry.addr == 0) {
         break;
       }
 
-      bytes_flushed += entry_addr.bytes;
+      bytes_flushed += entry.bytes;
       total_proc++;
-
-      // i += sizeof(log_t) + entry_addr.bytes;
     }
 
     DBGH(4) << "total_proc = " << total_proc << "\n";
-    // fprintf(stderr, "total proc = %lu\n", total_proc);
     DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
     
-    tx_log_count_dist->add(total_proc);
+    cxlbuf::tx_log_count_dist->add(total_proc);
 
     pmemops->drain();
       
@@ -388,21 +297,21 @@ int snapshot(void *addr, size_t bytes, int flags) {
       exit(1);
     }
   }
-  current_log_off = 0;
-  current_log_cnt = 0;
+  tls_log.current_log_off = 0;
+  tls_log.entries.clear();
   return 0;
 }
 
 int munmap (void *__addr, size_t __len) __THROW {
   DBGH(4) << "mumap intercepted\n";
-  for (auto &range : mapped_addr) {
+  for (auto &range : cxlbuf::mapped_addr) {
     if (__addr >= (void*)range.second.start 
         && __addr < (void*)range.second.end) {
       if (__addr != (void*)range.second.start) {
         DBGE << "Unmapping part of address range not supported" << std::endl;
         exit(1);
       } else {
-        mapped_addr.erase(mapped_addr.find(range.first));
+        cxlbuf::mapped_addr.erase(cxlbuf::mapped_addr.find(range.first));
         break;
       }
     }

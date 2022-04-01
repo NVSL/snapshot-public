@@ -29,7 +29,6 @@ extern "C" {
   void libstoreinst_ctor();
 
   extern void *start_addr, *end_addr;
-  extern char *log_area, *addr_area, *pm_back;
   extern size_t current_log_off, current_log_cnt;
   extern bool startTracking;
   extern bool storeInstEnabled;

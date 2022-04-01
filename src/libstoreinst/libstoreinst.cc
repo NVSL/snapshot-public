@@ -21,10 +21,6 @@ NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
 
 extern "C" {
   void *start_addr, *end_addr = nullptr;
-  char *log_area;
-  char *addr_area;
-  size_t current_log_off = 0;
-  size_t current_log_cnt = 0;
   bool startTracking = false;
   bool storeInstEnabled = false;
   bool cxlModeEnabled = false;
@@ -32,13 +28,13 @@ extern "C" {
   std::ofstream *traceStream;
   
   void init_counters() {
-    skip_check_count = new nvsl::Counter();
-    logged_check_count = new nvsl::Counter();
-    tx_log_count_dist = new nvsl::StatsFreq<>();
+    nvsl::cxlbuf::skip_check_count = new nvsl::Counter();
+    nvsl::cxlbuf::logged_check_count = new nvsl::Counter();
+    nvsl::cxlbuf::tx_log_count_dist = new nvsl::StatsFreq<>();
 
-    skip_check_count->init("skip_check_count", "Skipped memory checks");
-    logged_check_count->init("logged_check_count", "Logged memory checks");
-    tx_log_count_dist->init("tx_log_count_dist", 
+    nvsl::cxlbuf::skip_check_count->init("skip_check_count", "Skipped memory checks");
+    nvsl::cxlbuf::logged_check_count->init("logged_check_count", "Logged memory checks");
+    nvsl::cxlbuf::tx_log_count_dist->init("tx_log_count_dist", 
                             "Distribution of number of logs in a transaction",
                             5, 0, 30);
   }
@@ -73,7 +69,7 @@ extern "C" {
 
   __attribute__((__constructor__))
   void libstoreinst_ctor() {
-    init_dlsyms();
+    nvsl::cxlbuf::init_dlsyms();
     init_counters();
     init_addrs();
     init_pmemops();
@@ -83,48 +79,20 @@ extern "C" {
     cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
 
     printf("Address range = [%p:%p]\n", start_addr, end_addr);
-
-    const std::string buf_f = "/mnt/pmem0/buf";
-    const int fd = open(buf_f.c_str(), O_RDWR);
-
-    if (fd == -1) {
-      perror("open failed");
-      exit(1);
-    }
-    
-    fprintf(stderr, "%p +%lu\n", (void*)((char*)end_addr+(BUF_SIZE*2)), 2*BUF_SIZE);
-    log_area = (char*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
-                                MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
-
-    if (log_area == (char*)-1) {
-      perror("mmap failed");
-      exit(1);
-    }
-
-    lseek(fd, 0, SEEK_SET);
-    addr_area = (char*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
-                           MAP_ANONYMOUS | MAP_PRIVATE, 0, BUF_SIZE);
-
-    if (addr_area == (char*)-1) {
-      perror("addr_area mmap failed");
-      exit(1);
-    }
-  
-    printf("Mounted log area at %p\n", (void*)log_area);
   }
   
   __attribute__((unused))
   void checkMemory(void* ptr) {
     if (startTracking) {
       if (start_addr < ptr and ptr < end_addr) {
-        log_range(ptr, 8);
+        tls_log.log_range(ptr, 8);
 #ifndef RELEASE
         if (get_env_val(ENABLE_CHECK_MEMORY_TRACING_ENV)) {
           *traceStream << "-----\n" << nvsl::get_stack_trace() << "\n\n";
         }
 #endif
       } else {
-        ++*skip_check_count;
+        ++*nvsl::cxlbuf::skip_check_count;
       }
     }
   }
@@ -132,8 +100,8 @@ extern "C" {
   __attribute__((destructor))
   void libstoreinst_dtor() {
     std::cerr << "Summary:\n";
-    std::cerr << skip_check_count->str() << "\n";
-    std::cerr << logged_check_count->str() << "\n";
-    std::cerr << tx_log_count_dist->str() << "\n";
+    std::cerr << nvsl::cxlbuf::skip_check_count->str() << "\n";
+    std::cerr << nvsl::cxlbuf::logged_check_count->str() << "\n";
+    std::cerr << nvsl::cxlbuf::tx_log_count_dist->str() << "\n";
   }
 }

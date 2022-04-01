@@ -24,22 +24,22 @@ execute() {
 
     printf "${NAME},"
 
-    rm -f "${PMDK_POOL}"
+    rm -f "${PMDK_POOL}"*
 
-    # pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
+    pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
     
     pmdk=$(printf "$OP" | "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${pmdk},"
 
-    rm -f "${PMDK_POOL}"
+    rm -f "${PMDK_POOL}"*
     cxlbuf=$(printf "$OP" | CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${cxlbuf},"
 
-    rm -f "${PMDK_POOL}"
+    rm -f "${PMDK_POOL}*"
     printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
