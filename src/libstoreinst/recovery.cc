@@ -11,18 +11,81 @@
 #include "nvsl/utils.hh"
 #include "recovery.hh"
 #include "utils.hh"
+#include "log.hh"
 
+#include <fcntl.h>
 #include <filesystem>
 #include <sys/mman.h>
 
 using namespace nvsl;
 
-bool cxlbuf::PmemFile::needs_recovery() { return true; }
 
-void cxlbuf::PmemFile::recover() {}
+std::vector<fs::path> cxlbuf::PmemFile::needs_recovery() const {
+  std::vector<fs::path> result = {};
+  const auto dfname = this->get_dependency_fname();
+
+  if (fs::is_regular_file(dfname)) {
+    const std::ifstream df(dfname);
+    std::stringstream contents;
+    contents << df.rdbuf();
+
+    const auto logs = split(contents.str(), "\n");
+
+    DBGH(1) << "Found " << logs.size() << " logs" << std::endl;
+    
+    for (const auto &log : logs) {
+      DBGH(3) << "Checking log " << log << std::endl;
+
+      const auto toks = split(log, ",", 3);
+      const auto lfname = S(Log::LOG_LOC) + "/" + toks[0] + "." + toks[1]
+        + ".log";
+
+      if (fs::is_regular_file(lfname)) {
+        DBGH(2) << "Found log " << log << std::endl;
+
+        const auto log_ptr = Log::get_log_by_id(toks[0] + "." + toks[1]);
+        
+        if (log_ptr->state == Log::State::ACTIVE) {
+          DBGH(2) << "Log needs recovery" << std::endl;
+
+          result.push_back(log);
+          break;
+        } else {
+          DBGH(2) << "Log does not need recovery. Log state = "
+                  << (int)log_ptr->state << std::endl;
+        }
+      } else {
+        DBGH(2) << "Log does not exist" << std::endl;
+      }
+    }
+  }
+
+  return result;
+}
+
+void cxlbuf::PmemFile::recover(const std::vector<fs::path> &logs) {
+  for (const auto &log : logs) {
+    const auto toks = split(log, ",", 3);
+    const auto pid = std::stoi(toks[0]);
+    const auto tid = std::stoull(toks[1]);
+    const auto addr = std::stoull(toks[2]);
+
+    DBGH(4) << "Log pid = " << pid << " tid = " << tid << " addr = "
+            << (void*)addr << std::endl;
+
+    const auto log_ptr = Log::get_log_by_id(S(pid) + "." + S(tid));
+
+    DBGH(4) << "Total log size " << log_ptr->log_offset << " bytes" << std::endl;
+    exit(1);
+  }
+}
 
 std::string cxlbuf::PmemFile::get_backing_fname() const {
     return this->path.string() + ".cxlbuf_backing";
+}
+
+std::string cxlbuf::PmemFile::get_dependency_fname() const {
+    return this->path.string() + "-dependencies.txt";
 }
 
 bool cxlbuf::PmemFile::has_backing_file() {
@@ -74,13 +137,36 @@ void cxlbuf::PmemFile::map_backing_file() {
 cxlbuf::PmemFile::PmemFile(const fs::path &path, void* addr, size_t len)
   : path(path), addr(addr), len(len) {
 
-  if (this->needs_recovery()) {
-    recover();
+  if (const auto recovery_files = this->needs_recovery();
+      not recovery_files.empty()) {
+    recover(recovery_files);
   }
 }
 
-void cxlbuf::PmemFile::set_addr(void *addr) {
-  this->addr = addr;
+void cxlbuf::PmemFile::set_addr(void *addr) { this->addr = addr; }
+
+void cxlbuf::PmemFile::write_dependency() {
+  const int fd = open(this->get_dependency_fname().c_str(),
+                      O_CREAT | O_APPEND | O_RDWR, 0666);
+
+  if (fd == -1) {
+    perror("Unable to open/create dependency file");
+    exit(1);
+  }
+
+  const int pid = getpid();
+  const pthread_t tid = pthread_self();
+
+  const auto entry = S(pid) + "," + S(tid) + "," + S((uint64_t)this->addr) + "\n";
+
+  const auto bytes = write(fd, entry.c_str(), strlen(entry.c_str()));
+
+  if ((size_t)bytes != strlen(entry.c_str())) {
+    perror("Unable to write to the dependency file");
+    exit(1);
+  }
+
+  close(fd);
 }
 
 void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd, off_t off) {
@@ -113,6 +199,10 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd, off_t off
   } else {
     DBGW << "Call to mmap failed" << std::endl;
   }
+
+  /* Add an entry for this process to the dependency file. This will allow us
+     to locate the logs when the file is openede after a crash */
+  this->write_dependency();
 
   return result;
 }

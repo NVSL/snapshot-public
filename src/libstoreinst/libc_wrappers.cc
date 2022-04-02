@@ -236,8 +236,14 @@ __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
   char *pm_back = (char*)0x20000000000;
 
+  tls_log.log_area->log_offset = tls_log.current_log_off;
+  pmemops->flush(&tls_log.log_area->log_offset,
+                 sizeof(tls_log.log_area->log_offset));
+  
   /* Drain all the stores to the log before modifying the backing file */
   pmemops->drain();
+
+  tls_log.set_state(cxlbuf::Log::State::ACTIVE);
   
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
@@ -283,7 +289,8 @@ int snapshot(void *addr, size_t bytes, int flags) {
     cxlbuf::tx_log_count_dist->add(total_proc);
 
     pmemops->drain();
-      
+
+    tls_log.set_state(cxlbuf::Log::State::COMMITTED);
   } else {
     DBGH(1) << "Calling real msync" << std::endl;
     

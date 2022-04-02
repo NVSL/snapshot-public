@@ -23,10 +23,16 @@ extern nvsl::PMemOps *pmemops;
 using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
-  auto &log_entry = *(log_t*)((char*)log_area + current_log_off);
+  auto &log_entry = *(log_entry_t*)((char*)log_area->entries + current_log_off);
     
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
+
+    /* Since we recycle log, reset the state if it was committed before this
+       operation */
+    if (this->get_state() == State::COMMITTED) {
+      this->set_state(State::EMPTY);
+    }
 
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
@@ -41,11 +47,41 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 
     /* Align the log offset to the next cacheline. This reduces the number of
        clwb needed */
-    current_log_off += sizeof(log_t) + bytes;
+    current_log_off += sizeof(log_entry_t) + bytes;
     current_log_off = ((current_log_off+63)/64)*64;
 
     assert(current_log_off < BUF_SIZE);
   }
+}
+
+cxlbuf::Log::log_layout_t
+*cxlbuf::Log::get_log_by_id(const std::string &name) {
+  const auto log_fname = fs::path(Log::LOG_LOC) / fs::path(name + ".log");
+
+  if (not fs::is_regular_file(log_fname)) {
+    DBGE << "Requested log file " << log_fname << " does not exist."
+         << std::endl;
+  }
+
+  int fd = open(log_fname.c_str(), O_RDWR);
+  if (fd == -1) {
+    DBGE << "Unable to open log file " << log_fname << ": " << std::endl;
+    DBGE << PSTR() << std::endl;;
+    exit(1);
+  }
+
+  const auto fsize = fs::file_size(log_fname);
+  const auto flags = MAP_PRIVATE;
+  const auto prot = PROT_READ | PROT_WRITE;
+  auto log_ptr = (log_layout_t*)real_mmap(nullptr, fsize, prot, flags, fd, 0);
+
+  if (log_ptr == (log_layout_t*)-1) {
+    DBGE << "Unable to mmap log file " << log_fname << ": " << std::endl;
+    DBGE << PSTR() << std::endl;;
+    exit(1);
+  }  
+  
+  return log_ptr;
 }
 
 void cxlbuf::Log::init_dirs() {
@@ -81,10 +117,10 @@ void cxlbuf::Log::init_thread_buf() {
   }
 
 
-  log_area = (char*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
-                              MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
+  log_area = (log_layout_t*)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
+                                      MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
 
-  if (log_area == (char*)-1) {
+  if (log_area == (log_layout_t*)-1) {
     perror("mmap for buffer failed");
     exit(1);
   }

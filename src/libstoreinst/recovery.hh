@@ -9,6 +9,9 @@
 #pragma once
 
 #include <filesystem>
+#include <vector>
+
+#include "log.hh"
 
 namespace fs = std::filesystem;
 
@@ -26,20 +29,29 @@ namespace nvsl {
       /**
        * @brief Check if the file needs recovery
        * @param[in] path Path to the original file
-       * @return Returns true if the file needs recovery
+       * @return Returns list of logs that need recovery
        */
-      bool needs_recovery();
+      std::vector<fs::path> needs_recovery() const;
 
       /**
        * @brief Recover all the outstanding logs in the file
        * @param[in] path Path to the original file
        */
-      void recover();
+      void recover(const std::vector<fs::path> &logs);
 
       void create_backing_file_internal();
       bool has_backing_file();
       std::string get_backing_fname() const;
-
+      std::string get_dependency_fname() const;
+      
+      /**
+       * @brief Add pid.tid entry to the dependency file
+       *
+       * @details Add an entry for this process to the dependency file. This
+       * will allow us to locate the logs when the file is openede after a
+       * crash.
+       */
+      void write_dependency();
     public:
       /**
        * @brief Try recovery and creating backing files
