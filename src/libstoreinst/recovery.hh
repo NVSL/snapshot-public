@@ -31,18 +31,23 @@ namespace nvsl {
        * @param[in] path Path to the original file
        * @return Returns list of logs that need recovery
        */
-      std::vector<fs::path> needs_recovery() const;
+      std::vector<std::string> needs_recovery() const;
 
       /**
        * @brief Recover all the outstanding logs in the file
        * @param[in] path Path to the original file
        */
-      void recover(const std::vector<fs::path> &logs);
+      void recover(const std::vector<std::string> &logs);
 
       void create_backing_file_internal();
       bool has_backing_file();
       std::string get_backing_fname() const;
       std::string get_dependency_fname() const;
+
+      /**
+       * @brief Get the mapping addr and length for this file
+       */
+      std::pair<void*, size_t> get_map_dimensions() const;
       
       /**
        * @brief Add pid.tid entry to the dependency file

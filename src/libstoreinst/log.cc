@@ -12,6 +12,7 @@
 
 #include "log.hh"
 #include "nvsl/stats.hh"
+#include "nvsl/utils.hh"
 #include "nvsl/pmemops.hh"
 // #include "libdsaemu.hh"
 
@@ -23,7 +24,8 @@ extern nvsl::PMemOps *pmemops;
 using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
-  auto &log_entry = *(log_entry_t*)((char*)log_area->entries + current_log_off);
+  auto &log_entry = *(log_entry_t*)((char*)log_area->entries
+                                    + log_area->log_offset);
     
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
@@ -38,6 +40,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     this->entries.emplace_back((size_t)start, bytes);
     
     /* Write to the persistent log and flush and fence it */
+    log_entry.is_disabled = 0;
     log_entry.addr = (uint64_t)start;
     log_entry.bytes = bytes;
     real_memcpy(&log_entry.val, start, bytes);
@@ -45,19 +48,23 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 
     ++*logged_check_count;
 
-    /* Align the log offset to the next cacheline. This reduces the number of
-       clwb needed */
-    current_log_off += sizeof(log_entry_t) + bytes;
-    current_log_off = ((current_log_off+63)/64)*64;
+    /*
+     * Align the log offset to the next cacheline.
+     * This reduces the number of clwb needed
+     */
+    log_area->log_offset += sizeof(log_entry_t) + bytes;
+    log_area->log_offset = ((log_area->log_offset+63)/64)*64;
 
-    assert(current_log_off < BUF_SIZE);
+    assert(log_area->log_offset < BUF_SIZE);
   }
 }
 
-cxlbuf::Log::log_layout_t
-*cxlbuf::Log::get_log_by_id(const std::string &name) {
+std::tuple<cxlbuf::Log::log_layout_t*, fs::path>
+cxlbuf::Log::get_log_by_id(const std::string &name,
+                            void *addr /* = nullptr */) {
   const auto log_fname = fs::path(Log::LOG_LOC) / fs::path(name + ".log");
 
+  /* Check and open the log file */
   if (not fs::is_regular_file(log_fname)) {
     DBGE << "Requested log file " << log_fname << " does not exist."
          << std::endl;
@@ -70,10 +77,14 @@ cxlbuf::Log::log_layout_t
     exit(1);
   }
 
+  /* mmap the log file */
   const auto fsize = fs::file_size(log_fname);
-  const auto flags = MAP_PRIVATE;
+  const auto flags = MAP_SHARED;
   const auto prot = PROT_READ | PROT_WRITE;
-  auto log_ptr = (log_layout_t*)real_mmap(nullptr, fsize, prot, flags, fd, 0);
+
+  DBGH(4) << "Calling real_" << mmap_to_str(addr, fsize, prot, flags, fd, 0)
+          << " for log " << fs::path(log_fname) << std::endl;
+  auto log_ptr = (log_layout_t*)real_mmap(addr, fsize, prot, flags, fd, 0);
 
   if (log_ptr == (log_layout_t*)-1) {
     DBGE << "Unable to mmap log file " << log_fname << ": " << std::endl;
@@ -81,7 +92,7 @@ cxlbuf::Log::log_layout_t
     exit(1);
   }  
   
-  return log_ptr;
+  return {log_ptr, log_fname};
 }
 
 void cxlbuf::Log::init_dirs() {

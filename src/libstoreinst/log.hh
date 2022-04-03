@@ -30,7 +30,8 @@ namespace nvsl {
        * @brief struct for storing log in persistent memory
        */
       struct log_entry_t {
-        uint64_t addr;
+        uint8_t is_disabled;
+        uint64_t addr : 56;
         uint64_t bytes;
 
         NVSL_BEGIN_IGNORE_WPEDANTIC
@@ -74,13 +75,12 @@ namespace nvsl {
       /** @brief Voltile list of all the entries */
       std::vector<log_entry_lean_t> entries;
 
-      size_t current_log_off;
-      
       /** @brief Persistent log area */
       log_layout_t *log_area = nullptr;
 
       /** @brief Get a log_layout_t object using its pid.tid name */
-      static Log::log_layout_t *get_log_by_id(const std::string &name);
+      static std::tuple<Log::log_layout_t*, fs::path>
+      get_log_by_id(const std::string &name, void *addr = nullptr);
       
       Log();
 

@@ -16,12 +16,14 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/mman.h>
+#include <sys/sendfile.h>
+#include <unordered_set>
 
 using namespace nvsl;
 
 
-std::vector<fs::path> cxlbuf::PmemFile::needs_recovery() const {
-  std::vector<fs::path> result = {};
+std::vector<std::string> cxlbuf::PmemFile::needs_recovery() const {
+  std::vector<std::string> result = {};
   const auto dfname = this->get_dependency_fname();
 
   if (fs::is_regular_file(dfname)) {
@@ -43,7 +45,7 @@ std::vector<fs::path> cxlbuf::PmemFile::needs_recovery() const {
       if (fs::is_regular_file(lfname)) {
         DBGH(2) << "Found log " << log << std::endl;
 
-        const auto log_ptr = Log::get_log_by_id(toks[0] + "." + toks[1]);
+        const auto [log_ptr, _] = Log::get_log_by_id(toks[0] + "." + toks[1]);
         
         if (log_ptr->state == Log::State::ACTIVE) {
           DBGH(2) << "Log needs recovery" << std::endl;
@@ -54,6 +56,14 @@ std::vector<fs::path> cxlbuf::PmemFile::needs_recovery() const {
           DBGH(2) << "Log does not need recovery. Log state = "
                   << (int)log_ptr->state << std::endl;
         }
+
+        int mu_ret = munmap(log_ptr, fs::file_size(lfname));
+
+        if (mu_ret == -1) {
+          DBGE << "munmap for log failed" << std::endl;
+          DBGE << PSTR();
+          exit(1);
+        }
       } else {
         DBGH(2) << "Log does not exist" << std::endl;
       }
@@ -63,20 +73,100 @@ std::vector<fs::path> cxlbuf::PmemFile::needs_recovery() const {
   return result;
 }
 
-void cxlbuf::PmemFile::recover(const std::vector<fs::path> &logs) {
+std::pair<void*, size_t> cxlbuf::PmemFile::get_map_dimensions() const {
+  return {this->addr, this->len};
+}
+
+void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
   for (const auto &log : logs) {
     const auto toks = split(log, ",", 3);
     const auto pid = std::stoi(toks[0]);
     const auto tid = std::stoull(toks[1]);
-    const auto addr = std::stoull(toks[2]);
+    auto addr = (void*)std::stoull(toks[2]);
 
     DBGH(4) << "Log pid = " << pid << " tid = " << tid << " addr = "
             << (void*)addr << std::endl;
 
-    const auto log_ptr = Log::get_log_by_id(S(pid) + "." + S(tid));
+    const auto [log_ptr, lfname]
+      = Log::get_log_by_id(S(pid) + "." + S(tid));
 
     DBGH(4) << "Total log size " << log_ptr->log_offset << " bytes" << std::endl;
-    exit(1);
+
+    DBGH(1) << "Replaying log" << std::endl;
+
+    // Prepare mmap arguments
+    const auto prot = PROT_READ | PROT_WRITE;
+    const auto flags = MAP_SHARED_VALIDATE | MAP_SYNC;
+    const auto fpath = this->path.string() + ".cxlbuf_backing";
+    const int fd = open(fpath.c_str(), O_RDWR);
+
+    if (fd == -1) {
+      DBGE << "Unable to open the file " << fpath << " to recover" << std::endl;
+      DBGE << PSTR();
+      exit(1);
+    }
+
+    // Map this file to the right address
+    void *maddr = real_mmap(addr, this->len, prot, flags, fd, 0);
+
+    if (maddr == (void*)-1) {
+      DBGE << "Unable to mmap file " << fpath << " to recover" << std::endl;
+      DBGE << PSTR();
+      exit(1);
+    }
+
+    // Find log entries that apply to this file
+    using log_entry_t = Log::log_entry_t;
+    size_t cur_off = 0;
+    while (cur_off < log_ptr->log_offset) {
+      log_entry_t *entry = (log_entry_t*)&(((char*)log_ptr->entries)[cur_off]);
+
+      DBGH(4) << "Checking entry (" << entry->addr << ", " << entry->bytes
+              << ")" << std::endl;
+      
+      if (((size_t)addr <= entry->addr) and
+          (entry->addr < ((size_t)addr + this->len)) and entry->is_disabled != 1) {
+        entry->is_disabled = 1;
+        const auto dst_addr = (void*)(size_t)entry->addr;
+
+        DBGH(4) << "Recovering location " << dst_addr << "...";
+
+        // Write, flush and drain
+        real_memcpy(dst_addr, entry->val, entry->bytes);
+        pmemops->flush(dst_addr, entry->bytes);
+        pmemops->drain();
+
+        DBG << "done" << std::endl;
+      } else {
+        DBGH(4) << "No recovery needed"<< std::endl;
+      }
+
+      cur_off += entry->bytes + sizeof(log_entry_t);
+      cur_off = ((cur_off + 63) / 64) * 64;
+
+      DBGH(4) << "New offset = " << cur_off << std::endl;
+    }
+
+    // Release all resources
+    close(fd);
+
+    int mu_ret = real_munmap(log_ptr, fs::file_size(lfname));
+
+    if (mu_ret == -1) {
+      DBGE << "munmap for log failed" << std::endl;
+      DBGE << PSTR();
+      exit(1);
+    }
+
+    mu_ret = real_munmap(addr, this->len);
+
+    if (mu_ret == -1) {
+      DBGE << "munmap for backing failed" << std::endl;
+      DBGE << PSTR();
+      exit(1);
+    }
+
+    DBGH(1) << "Recovery completed" << std::endl;
   }
 }
 
@@ -105,6 +195,33 @@ void cxlbuf::PmemFile::create_backing_file() {
   if (not this->has_backing_file()) {
     /* Only copy to the backing file if this is the first time */
     this->create_backing_file_internal();
+  } else {
+    DBGH(1) << "Recreating " << this->path << " from "
+            << this->get_backing_fname() << std::endl;
+    int src_fd = open(this->get_backing_fname().c_str(), O_RDONLY);
+    if (src_fd == -1) {
+      DBGE << "Unable to open the backing file for copy" << std::endl;
+      DBGE << PSTR() << std::endl;
+      exit(1);
+    }
+
+    int dst_fd = open(this->path.c_str(), O_WRONLY);
+    if (dst_fd == -1) {
+      DBGE << "Unable to open the original for copy" << std::endl;
+      DBGE << PSTR() << std::endl;
+      exit(1);
+    }
+
+    int sf_ret = sendfile(dst_fd, src_fd, 0, this->len);
+
+    if (sf_ret == -1) {
+      DBGE << "Sendfile for copying from backing file failed" << std::endl;
+      DBGE << PSTR() << std::endl;
+      exit(1);
+    }
+
+    close(src_fd);
+    close(dst_fd);
   }
 }
 

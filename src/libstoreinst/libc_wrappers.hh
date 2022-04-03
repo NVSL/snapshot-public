@@ -8,7 +8,15 @@
 
 extern void *(*real_memcpy)(void *, const void *, size_t);
 extern void *(*real_memmove)(void *, const void *, size_t);
-extern void *(*real_mmap)(void *, size_t, int, int, int, __off_t);
+extern void *(*real_mmap)(void *__addr, size_t __len, int __prot, int __flags,
+                          int __fd, __off_t __offset);
+extern void *(*real_mremap)(void *__addr, size_t __old_len, size_t __new_len,
+                            int __flags, ...);
+extern int (*real_munmap)(void *__addr, size_t __len);
+extern void (*real_sync)(void);
+extern int (*real_fsync)(int);
+extern int (*real_fdatasync)(int);
+extern int (*real_msync)(void *addr, size_t length, int flags);
 
 namespace nvsl {
   namespace cxlbuf {

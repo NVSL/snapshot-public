@@ -19,6 +19,8 @@ NVSL_DECL_ENV(PMEM_START_ADDR);
 NVSL_DECL_ENV(PMEM_END_ADDR);
 NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
 
+bool firstSnapshot = true;
+
 extern "C" {
   void *start_addr, *end_addr = nullptr;
   bool startTracking = false;
@@ -26,7 +28,7 @@ extern "C" {
   bool cxlModeEnabled = false;
   nvsl::PMemOps *pmemops;
   std::ofstream *traceStream;
-  
+
   void init_counters() {
     nvsl::cxlbuf::skip_check_count = new nvsl::Counter();
     nvsl::cxlbuf::logged_check_count = new nvsl::Counter();
@@ -83,8 +85,9 @@ extern "C" {
   
   __attribute__((unused))
   void checkMemory(void* ptr) {
+    // std::cerr << "CheckMemory at " << ptr << std::endl;
     if (startTracking) {
-      if (start_addr < ptr and ptr < end_addr) {
+      if (start_addr <= ptr and ptr < end_addr) {
         tls_log.log_range(ptr, 8);
 #ifndef RELEASE
         if (get_env_val(ENABLE_CHECK_MEMORY_TRACING_ENV)) {

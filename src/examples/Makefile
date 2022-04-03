@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk btree map linkedlist_tx
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map linkedlist_tx single_write
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -12,13 +12,17 @@ SUBDIRS := simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx kelly_hoh
 
 include ../common.make
 
-all: dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) map
+all: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
+	map
 
 map: btree_subdir
 	$(PUDDLES_MAKE) -C map
 
 dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
+
+single_write:
+	$(@printf "lakdf")../storeinst-pass/dclang++ -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed -std=c++20 -ldl -lstoreinst $@.cc -o $@
 
 cat-demo: cat-demo.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)

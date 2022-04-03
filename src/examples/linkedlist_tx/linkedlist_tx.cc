@@ -102,6 +102,8 @@ void append_node(mmf *res, linkedlist_t *ll_obj,
 
       ll_obj->tail->next = newTail;
       ll_obj->tail = newTail;
+
+      std::cerr << "Updated tail " << (void*)&ll_obj->tail << std::endl;
     }
 
     ll_obj->tail->data = val;
@@ -258,6 +260,7 @@ int main(int argc, char *argv[]) {
 
     // TX_BEGIN(res) { 
     root_ptr = res->construct<linkedlist_t>("root")();
+    std::cerr << "Root allocated at " << (void*)root_ptr << std::endl;
     // }
     // TX_END;
 
@@ -267,7 +270,7 @@ int main(int argc, char *argv[]) {
 
     memset(root_ptr, 0, sizeof(*root_ptr));
   } else {
-    std::cout << "Got previous root" << std::endl;
+    std::cout << "Got previous root" << (void*)root_ptr << std::endl;
   }
 
   // printf("Root uuid: %s\n", res->get_root_uuid().to_string().c_str());

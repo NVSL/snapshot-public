@@ -4,6 +4,7 @@
 #include "libstoreinst.hh"
 #include "log.hh"
 #include "nvsl/common.hh"
+#include "nvsl/envvars.hh"
 #include "nvsl/pmemops.hh"
 #include "nvsl/string.hh"
 #include "nvsl/utils.hh"
@@ -16,6 +17,8 @@
 #include <numeric>
 #include <sys/mman.h>
 #include <unistd.h>
+
+NVSL_DECL_ENV(CXLBUF_CRASH_ON_COMMIT);
 
 namespace fs = std::filesystem;
 using namespace nvsl;
@@ -236,7 +239,7 @@ __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
   char *pm_back = (char*)0x20000000000;
 
-  tls_log.log_area->log_offset = tls_log.current_log_off;
+  tls_log.log_area->log_offset = tls_log.log_area->log_offset;
   pmemops->flush(&tls_log.log_area->log_offset,
                  sizeof(tls_log.log_area->log_offset));
   
@@ -248,6 +251,22 @@ int snapshot(void *addr, size_t bytes, int flags) {
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
   if (storeInstEnabled) [[likely]] {
+    if (firstSnapshot) {
+      DBGH(1) << "== First snapshot ==" << std::endl;
+      firstSnapshot = false;
+
+      for (const auto &entry : cxlbuf::mapped_addr) {
+        if (entry.second.start <= (size_t)addr and entry.second.end > (size_t)addr) {
+          DBGH(2) << "Found the entry [" << entry.second.start << ", " << entry.second.end << "]" << std::endl;
+          
+          void *dst = (void*)(entry.second.start + 0x10000000000);
+          void *src = (void*)(entry.second.start);
+          real_memcpy(dst, src, entry.second.end - entry.second.start);
+          break;
+        }
+      }
+    }
+    
     DBGH(1) << "Calling snapshot (not msync)" << std::endl;
 
     size_t total_proc = 0;
@@ -288,6 +307,12 @@ int snapshot(void *addr, size_t bytes, int flags) {
     
     cxlbuf::tx_log_count_dist->add(total_proc);
 
+    if (get_env_val(CXLBUF_CRASH_ON_COMMIT_ENV)) {
+      DBGW << "Crashing before commit (" << CXLBUF_CRASH_ON_COMMIT_ENV
+           << " is set)" << std::endl;
+      exit(1);
+    }
+
     pmemops->drain();
 
     tls_log.set_state(cxlbuf::Log::State::COMMITTED);
@@ -304,7 +329,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
       exit(1);
     }
   }
-  tls_log.current_log_off = 0;
+  tls_log.log_area->log_offset = 0;
   tls_log.entries.clear();
   return 0;
 }

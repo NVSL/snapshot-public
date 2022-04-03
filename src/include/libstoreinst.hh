@@ -34,4 +34,7 @@ extern "C" {
   extern bool storeInstEnabled;
   extern bool cxlModeEnabled;
   extern nvsl::PMemOps *pmemops;
+
+  // TODO: Implement a better solution
+  extern bool firstSnapshot;
 }
