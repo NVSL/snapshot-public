@@ -53,5 +53,9 @@ namespace libpuddles {
     void free(void *ptr) {
       ator->deallocate(ptr);
     }
+
+    void sync() {
+      msync(ator->get_address(), ator->get_size(), MS_SYNC);
+    }
   };
 }

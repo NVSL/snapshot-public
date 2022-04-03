@@ -30,14 +30,14 @@ namespace nvsl {
        * @brief struct for storing log in persistent memory
        */
       struct log_entry_t {
-        uint8_t is_disabled;
+        // uint8_t is_disabled : 8;
+        uint64_t bytes : 8;
         uint64_t addr : 56;
-        uint64_t bytes;
 
         NVSL_BEGIN_IGNORE_WPEDANTIC
         uint64_t val[];
         NVSL_END_IGNORE_WPEDANTIC
-      };
+      } __attribute__((packed));
 
       /**
        * @brief lean struct for tracking logged address and size
@@ -47,7 +47,7 @@ namespace nvsl {
         uint64_t bytes;
       };
 
-      enum State : uint8_t {
+      enum State : uint64_t {
         EMPTY,
         ACTIVE,
         COMMITTED
@@ -64,6 +64,8 @@ namespace nvsl {
 
       static constexpr const char* LOG_LOC = "/mnt/pmem0/cxlbuf_logs/";
     private:
+      size_t last_flush_offset = 0;
+      
       void init_dirs();
 
       /** @brief initialize and map this thread's log buffer */
@@ -74,6 +76,12 @@ namespace nvsl {
 
       /** @brief Voltile list of all the entries */
       std::vector<log_entry_lean_t> entries;
+
+      void clear() {
+        log_area->log_offset = 0;
+        last_flush_offset = 0;
+        entries.clear();
+      }
 
       /** @brief Persistent log area */
       log_layout_t *log_area = nullptr;
@@ -86,18 +94,29 @@ namespace nvsl {
 
       void log_range(void *start, size_t bytes);
 
-      void set_state(State state) {
+      void set_state(State state, bool flush_whole = false) {
         NVSL_ASSERT(this->log_area != nullptr, "Log area not initialized");
 
-        this->log_area->state = state;
-        pmemops->flush(&this->log_area->state, sizeof(this->log_area->state));
+
+        if (flush_whole) {
+          this->log_area->state = state;
+          pmemops->flush(this->log_area, sizeof(*this->log_area));
+        } else {
+          pmemops->streaming_wr(&this->log_area->state, &state, 
+                                sizeof(this->log_area->state));
+        }
+
         pmemops->drain();
+
       }
+
       State get_state() const {
         NVSL_ASSERT(this->log_area != nullptr, "Log area not initialized");
 
         return this->log_area->state; 
       }
+
+      void flush_all() const;
     };
 
     extern nvsl::Counter *skip_check_count, *logged_check_count;

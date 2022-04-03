@@ -125,8 +125,8 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
               << ")" << std::endl;
       
       if (((size_t)addr <= entry->addr) and
-          (entry->addr < ((size_t)addr + this->len)) and entry->is_disabled != 1) {
-        entry->is_disabled = 1;
+          (entry->addr < ((size_t)addr + this->len)) /*and entry->is_disabled != 1*/) {
+        // entry->is_disabled = 1;
         const auto dst_addr = (void*)(size_t)entry->addr;
 
         DBGH(4) << "Recovering location " << dst_addr << "...";
@@ -198,6 +198,7 @@ void cxlbuf::PmemFile::create_backing_file() {
   } else {
     DBGH(1) << "Recreating " << this->path << " from "
             << this->get_backing_fname() << std::endl;
+
     int src_fd = open(this->get_backing_fname().c_str(), O_RDONLY);
     if (src_fd == -1) {
       DBGE << "Unable to open the backing file for copy" << std::endl;

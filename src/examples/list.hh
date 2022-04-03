@@ -18,7 +18,7 @@
 
 namespace bip = boost::interprocess;
 
-typedef bip::rbtree_best_fit<bip::null_mutex_family> null_mutex_ator;
+typedef bip::simple_seq_fit<bip::null_mutex_family> null_mutex_ator;
 typedef bip::basic_managed_mapped_file<char, null_mutex_ator, bip::iset_index>
 mmf;
 

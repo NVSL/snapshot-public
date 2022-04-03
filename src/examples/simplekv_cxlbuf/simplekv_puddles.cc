@@ -138,7 +138,10 @@ int main(int argc, char *argv[]) {
 
       /* Execute the run trace */
       std::cout << "Executing run trace" << std::endl;
-      startTracking = true;          
+      startTracking = true;
+      root->put("a", 0, true);
+      msync(root, 1024, MS_SYNC);
+      
       size_t run_size = run_ops.size();
       clk.tick();
       volatile size_t result = 0;

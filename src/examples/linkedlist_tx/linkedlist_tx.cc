@@ -103,7 +103,7 @@ void append_node(mmf *res, linkedlist_t *ll_obj,
       ll_obj->tail->next = newTail;
       ll_obj->tail = newTail;
 
-      std::cerr << "Updated tail " << (void*)&ll_obj->tail << std::endl;
+      // std::cerr << "Updated tail " << (void*)&ll_obj->tail << std::endl;
     }
 
     ll_obj->tail->data = val;
@@ -280,6 +280,9 @@ int main(int argc, char *argv[]) {
   printf("Type 'h' for help\n$ ");
 
   startTracking = true;
+  append_node(res, root_ptr, 1);
+  pop_head(res, root_ptr);
+  msync(root_ptr, 4096, MS_SYNC);
 
   char buf[1024];
   while (fgets(buf, sizeof(buf), stdin)) {

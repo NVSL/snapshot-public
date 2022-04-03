@@ -15,11 +15,15 @@
 #include "nvsl/stats.hh"
 #include "nvsl/trace.hh"
 
-NVSL_DECL_ENV(PMEM_START_ADDR);
-NVSL_DECL_ENV(PMEM_END_ADDR);
+NVSL_DECL_ENV(CXLBUF_CRASH_ON_COMMIT);
 NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
+NVSL_DECL_ENV(PMEM_END_ADDR);
+NVSL_DECL_ENV(PMEM_START_ADDR);
+
 
 bool firstSnapshot = true;
+bool crashOnCommit = false;
+
 
 extern "C" {
   void *start_addr, *end_addr = nullptr;
@@ -69,12 +73,17 @@ extern "C" {
     pmemops = new nvsl::PMemOpsClwb();
   }
 
+  void init_envvars() {
+    crashOnCommit = get_env_val(CXLBUF_CRASH_ON_COMMIT_ENV);
+  }
+
   __attribute__((__constructor__))
   void libstoreinst_ctor() {
     nvsl::cxlbuf::init_dlsyms();
     init_counters();
     init_addrs();
     init_pmemops();
+    init_envvars();
 
     traceStream = new std::ofstream("/tmp/stacktrace");
 

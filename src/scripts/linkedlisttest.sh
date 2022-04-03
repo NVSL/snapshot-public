@@ -25,6 +25,7 @@ execute() {
     printf "${NAME},"
 
     rm -f "${PMDK_POOL}"*
+    rm -rf "${LOG_LOC}"
 
     pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
     
@@ -34,12 +35,14 @@ execute() {
     printf "${pmdk},"
 
     rm -f "${PMDK_POOL}"*
+    rm -rf "${LOG_LOC}"
     cxlbuf=$(printf "$OP" | CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${cxlbuf},"
 
     rm -f "${PMDK_POOL}*"
+    rm -rf "${LOG_LOC}"
     printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 

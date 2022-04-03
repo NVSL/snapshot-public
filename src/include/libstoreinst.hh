@@ -35,6 +35,7 @@ extern "C" {
   extern bool cxlModeEnabled;
   extern nvsl::PMemOps *pmemops;
 
-  // TODO: Implement a better solution
-  extern bool firstSnapshot;
 }
+// TODO: Implement a better solution
+extern bool firstSnapshot;
+extern bool crashOnCommit;

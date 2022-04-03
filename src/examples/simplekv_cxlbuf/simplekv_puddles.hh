@@ -95,7 +95,7 @@ public:
         values[val] = buckets[index][i].second;
 
         if (persist) {
-          snapshot(&values[val], sizeof(values[val]), MS_SYNC);
+          res->sync();
         }
 
         return;
@@ -118,7 +118,7 @@ public:
     //   std::cout << buckets[index][pos].first<< std::endl;
     // }
     if (persist) {
-      snapshot(&buckets[index][0], buckets[index].size() * sizeof(buckets[0][0]), MS_SYNC);
+      res->sync();
     }
   }
 };

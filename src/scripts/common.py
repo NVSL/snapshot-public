@@ -179,12 +179,12 @@ class Fig(object):
         return self
 
     def fmt_label(self, xlabel, ylabel):
-        self.ax.set_xlabel(xlabel, fontsize=Fig.fontsize_gbl)
-        self.ax.set_ylabel(ylabel, fontsize=Fig.fontsize_gbl)
+        self.ax.set_xlabel(xlabel, fontsize=Fig.fontsize_gbl, fontweight='bold')
+        self.ax.set_ylabel(ylabel, fontsize=Fig.fontsize_gbl, fontweight='bold')
 
         return self
 
-    def add_bar_labels(self, mask, fontsize=None):
+    def add_bar_labels(self, mask, fontsize=None, precision=1):
         rects = self.ax.patches
         mask_full = mask
         
@@ -202,6 +202,10 @@ class Fig(object):
             for i in range(len(mask)):
                 mask_full += [mask[i]] * factor
 
+        ylim = self.ax.get_ylim()
+        label_off = (ylim[1]-ylim[0])*0.1
+        label_pos = ylim[1] + label_off
+                
         i = 0
         for rect in rects:
             i += 1
@@ -209,9 +213,9 @@ class Fig(object):
                 continue
 
             height = rect.get_height()
-            label = round(height, 1)
+            label = round(height, precision)
             self.ax.text(
-                rect.get_x() + rect.get_width() / 2, 3, f"{label}x", ha="center", va="bottom",
+                rect.get_x() + rect.get_width() / 2, label_pos, f"{label}x", ha="center", va="bottom",
                 fontsize=label_fontsize
             )
 
@@ -227,3 +231,17 @@ class Fig(object):
         _ = self.ax.set_xticklabels(xlbl, rotation=0)
         
         return self
+    
+def rename_index(df, map):
+    return df.index.map(map)
+
+def rename_cols(df, map):
+    df.rename(columns=lambda x: map[x], inplace=True)
+    
+    return df
+
+def capitalize_index(df):
+    df.index = df.index.map(lambda x: x.capitalize())
+    
+    return df
+    

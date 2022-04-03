@@ -18,8 +18,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-NVSL_DECL_ENV(CXLBUF_CRASH_ON_COMMIT);
-
 namespace fs = std::filesystem;
 using namespace nvsl;
 
@@ -239,19 +237,16 @@ __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
   char *pm_back = (char*)0x20000000000;
 
-  tls_log.log_area->log_offset = tls_log.log_area->log_offset;
-  pmemops->flush(&tls_log.log_area->log_offset,
-                 sizeof(tls_log.log_area->log_offset));
-  
-  /* Drain all the stores to the log before modifying the backing file */
-  pmemops->drain();
+  tls_log.flush_all();
 
-  tls_log.set_state(cxlbuf::Log::State::ACTIVE);
+  /* Drain all the stores to the log and update its state before modifying the
+     backing file */
+  tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
   
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
   if (storeInstEnabled) [[likely]] {
-    if (firstSnapshot) {
+    if (firstSnapshot) [[unlikely]] {
       DBGH(1) << "== First snapshot ==" << std::endl;
       firstSnapshot = false;
 
@@ -285,15 +280,13 @@ int snapshot(void *addr, size_t bytes, int flags) {
                 << (void*)entry.addr << " -> " << (void*)dst_addr
                 << std::endl;
 
-        if (entry.bytes > 64) {
+        if (entry.bytes > 256) [[unlikely]] {
           real_memcpy((void*)dst_addr, (void*)entry.addr, entry.bytes);
           pmemops->flush((void*)dst_addr, entry.bytes);
         } else {
           pmemops->streaming_wr((void*)dst_addr, (void*)entry.addr,
                                 entry.bytes);
         }
-
-        entry.addr = 0;
       } else if (entry.addr == 0) {
         break;
       }
@@ -304,18 +297,20 @@ int snapshot(void *addr, size_t bytes, int flags) {
 
     DBGH(4) << "total_proc = " << total_proc << "\n";
     DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
-    
+
+#ifndef RELEASE
     cxlbuf::tx_log_count_dist->add(total_proc);
+#endif
 
-    if (get_env_val(CXLBUF_CRASH_ON_COMMIT_ENV)) {
-      DBGW << "Crashing before commit (" << CXLBUF_CRASH_ON_COMMIT_ENV
-           << " is set)" << std::endl;
-      exit(1);
-    }
+    // if (crashOnCommit) [[unlikely]] {
+      // DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)" << std::endl;
+      // exit(1);
+    // }
 
+    /* Update the state to drop the log and drain all the updates to the backing
+       file */
     pmemops->drain();
-
-    tls_log.set_state(cxlbuf::Log::State::COMMITTED);
+    tls_log.set_state(cxlbuf::Log::State::EMPTY);
   } else {
     DBGH(1) << "Calling real msync" << std::endl;
     
@@ -329,8 +324,9 @@ int snapshot(void *addr, size_t bytes, int flags) {
       exit(1);
     }
   }
-  tls_log.log_area->log_offset = 0;
-  tls_log.entries.clear();
+
+  tls_log.clear();
+  
   return 0;
 }
 

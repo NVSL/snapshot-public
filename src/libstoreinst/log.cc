@@ -30,32 +30,74 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
 
-    /* Since we recycle log, reset the state if it was committed before this
-       operation */
-    if (this->get_state() == State::COMMITTED) {
-      this->set_state(State::EMPTY);
-    }
+    NVSL_ASSERT((bytes % 8 == 0) and (bytes < 4096), "");
 
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
     
     /* Write to the persistent log and flush and fence it */
-    log_entry.is_disabled = 0;
     log_entry.addr = (uint64_t)start;
-    log_entry.bytes = bytes;
-    real_memcpy(&log_entry.val, start, bytes);
-    pmemops->flush(&log_entry, sizeof(log_entry) + bytes);
+    log_entry.bytes = bytes/8;
 
+    real_memcpy(&log_entry.val, start, bytes);
+
+    const size_t entry_sz = sizeof(log_entry_t) + bytes;
+    log_area->log_offset += entry_sz;
+
+    const size_t cls_to_flush 
+      = (log_area->log_offset - last_flush_offset + 63) / 64;
+
+    DBGH(4) << "Entry size = " << entry_sz << " bytes."
+            << " last_flush_offset = " << last_flush_offset
+            << " log_area->log_offset = " << log_area->log_offset << std::endl;
+
+    /* Flush all the lines only if the current entry ends at a cacheline
+       boundary */
+    if (log_area->log_offset%64 == 0){
+      DBGH(4) << "[1] Flushing " << cls_to_flush << " cachelines starting at "
+              << (void*)((char*)log_area + last_flush_offset) << std::endl;
+
+      pmemops->flush((char*)log_area + last_flush_offset, cls_to_flush * 64);
+
+      last_flush_offset = log_area->log_offset;
+    } else {
+      if (cls_to_flush > 1) {
+        DBGH(4) << "[2] Flushing " << cls_to_flush - 1
+                << " cachelines starting at "
+                << (void*)((char*)log_area + last_flush_offset) << std::endl;
+        
+        /* FLush all but the last cacheline. Last (partially written) cacheline
+         * will be flushed with the next entry or on snapshot */
+        pmemops->flush((char*)log_area + last_flush_offset,
+                       (cls_to_flush - 1) * 64);
+        last_flush_offset += (cls_to_flush - 1) * 64;
+      }
+    }
+
+#ifndef RELEASE
     ++*logged_check_count;
+#endif
 
     /*
      * Align the log offset to the next cacheline.
      * This reduces the number of clwb needed
      */
-    log_area->log_offset += sizeof(log_entry_t) + bytes;
-    log_area->log_offset = ((log_area->log_offset+63)/64)*64;
 
-    assert(log_area->log_offset < BUF_SIZE);
+    // log_area->log_offset = ((log_area->log_offset+63)/64)*64;
+
+    NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
+  }
+}
+
+
+void cxlbuf::Log::flush_all() const {
+  if (this->last_flush_offset != this->log_area->log_offset) {
+    const void* start = (char*)log_area->entries + last_flush_offset;
+    const size_t len = this->log_area->log_offset - this->last_flush_offset;
+
+    DBGH(3) << "Flushing unflushed " << len << " bytes" << std::endl; 
+    
+    pmemops->flush((void*)start, len);
   }
 }
 
