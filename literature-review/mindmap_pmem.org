@@ -24,10 +24,19 @@ DUDETM like
 ** DUDETM: Building Durable Transactions with Decoupling for Persistent Memory
 ** Atomic In-place Updates for Non-volatile Main Memories with Kamino-Tx
 Shadow-paging like
+*** Durable Transactional Memory Can Scale with Timestone
+Uses multiple levels of logs: operation log (pronto like) -> update log (undo/redo like)
+Requires programmer annotation
 ** Journaling of Journal Is (Almost) Free
 ** Torturing Databases for Fun and Profit
 Understands how the databases are not crash consistent
 ** iDO: Compiler-Directed Failure Atomicity for Nonvolatile Memory :Related:
+*** PMThreads: Persistent Memory Threads Harnessing Versioned Shadow Copies
+Does shadow paging using lock region (and thread creation/death). Has two copies
+for the PM data and switches between them to make things consistent. Tracks
+stores using compiler pass and persists them at a page level.
+
+*** Durable Transactional Memory Can Scale with Timestone
 
 ** Application Crash Consistency and Performance with CCFS
 New FS interface for "streams" that are ordered collection of writes

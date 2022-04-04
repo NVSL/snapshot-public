@@ -18,7 +18,7 @@ from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
 import matplotlib.patches as patches
 
 import seaborn as sns
-
+import math
 
 
 def stats_to_dict(stats_path: str) -> Dict:
@@ -152,8 +152,8 @@ class Fig(object):
             'zorder': 3,
         }}
 
-    def fmt_grid(self, axis='both'):
-        self.ax.grid(axis=axis)
+    def fmt_grid(self, axis='both', **kwargs):
+        self.ax.grid(axis=axis, **kwargs)
 
         return self
 
@@ -184,7 +184,7 @@ class Fig(object):
 
         return self
 
-    def add_bar_labels(self, mask, fontsize=None, precision=1):
+    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white'):
         rects = self.ax.patches
         mask_full = mask
         
@@ -193,9 +193,11 @@ class Fig(object):
         if fontsize:
             label_fontsize = fontsize
 
+        # Check if the input mask array can be used to generate the full mask
         if len(rects)%len(mask) != 0:
             raise Exception("Bars in the axis must be a multiple of mask length")
 
+        # Generate the full mask from the input mask
         if len(mask) != len(rects):
             mask_full = []
             factor = int(len(rects)/len(mask))
@@ -205,7 +207,7 @@ class Fig(object):
         ylim = self.ax.get_ylim()
         label_off = (ylim[1]-ylim[0])*0.1
         label_pos = ylim[1] + label_off
-                
+        
         i = 0
         for rect in rects:
             i += 1
@@ -213,10 +215,20 @@ class Fig(object):
                 continue
 
             height = rect.get_height()
+                
+            # If the label is with the bar, get the bar height
+            if not over_fig:
+                label_pos = height + label_off*0.5
+
+                # If the label overlaps with the border, move it over
+                if abs(label_pos - ylim[1]) < (ylim[1]-ylim[0])*0.05:
+                    label_pos = ylim[1] + label_off
+                
             label = round(height, precision)
-            self.ax.text(
+            tx = self.ax.text(
                 rect.get_x() + rect.get_width() / 2, label_pos, f"{label}x", ha="center", va="bottom",
-                fontsize=label_fontsize
+                fontsize=label_fontsize,
+                bbox=dict(facecolor=facecolor, alpha=alpha, edgecolor=edgecolor)
             )
 
         return self

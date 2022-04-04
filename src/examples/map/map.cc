@@ -107,6 +107,7 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
     for (size_t i = 0; i < args.bulk_cnt; i++) {
       root_ptr->mapops->insert(root_ptr, rand(), 0);
     }
+    clk.reconcile();
     clk.tock();
     break;
   case 'r':
@@ -123,6 +124,7 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
       for (size_t i = 0; i < args.bulk_cnt; i++) {
         root_ptr->mapops->remove(root_ptr, keys[i]);
       }
+      clk.reconcile();
       clk.tock();
     }
     break;
@@ -140,6 +142,7 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
       for (size_t i = 0; i < args.bulk_cnt; i++) {
         root_ptr->mapops->lookup(root_ptr, keys[i]);
       }
+      clk.reconcile();
       clk.tock();
     }
     break;
@@ -149,6 +152,7 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
     break;
   }
 
+  clk.reconcile();
   std::cout << clk.summarize(args.bulk_cnt) << std::endl;
 }
 int main(int argc, char *argv[]) {
@@ -156,8 +160,7 @@ int main(int argc, char *argv[]) {
 
   auto *res = new bip::managed_mapped_file(bip::open_or_create, 
                                            args.puddle_path.c_str(),
-                                           MIN_POOL_SZ * 10, 
-                                           (const void*)0x10000000000);
+                                           MIN_POOL_SZ * 1000);
 
   tls_res = res;
   
@@ -174,7 +177,7 @@ int main(int argc, char *argv[]) {
       throw std::runtime_error("Allocating root failed");
     }
 
-    memset(root_ptr, 0, sizeof(*root_ptr));
+    // memset(root_ptr, 0, sizeof(*root_ptr));
   } else {
     std::cout << "Got previous root" << std::endl;
   }
@@ -185,6 +188,9 @@ int main(int argc, char *argv[]) {
 
   size_t op_count = 0;
   startTracking = true;
+
+  root_ptr->mapops->insert(root_ptr, 0, 0);
+  msync(res->get_address(), res->get_size(), MS_SYNC);
 
   if (args.bulk) {
     perform_bulk_ops(args, root_ptr);
@@ -255,6 +261,7 @@ int main(int argc, char *argv[]) {
 
       std::cout << "$ ";
     }
+    clk.reconcile();
     clk.tock();
 
     std::cout << clk.summarize() << std::endl;

@@ -280,12 +280,19 @@ int snapshot(void *addr, size_t bytes, int flags) {
                 << (void*)entry.addr << " -> " << (void*)dst_addr
                 << std::endl;
 
-        if (entry.bytes > 256) [[unlikely]] {
-          real_memcpy((void*)dst_addr, (void*)entry.addr, entry.bytes);
-          pmemops->flush((void*)dst_addr, entry.bytes);
-        } else {
+        /* Streaming write is only allowed if the write size is a power of two
+           (popcount == 1) and dest address is aligned at entry.bytes */
+        bool str_wr_allowed = false;
+        if (__builtin_popcount(entry.bytes) == 1) {
+          str_wr_allowed = dst_addr % entry.bytes == 0;          
+        }
+
+        if (entry.bytes < 256 and str_wr_allowed) [[likely]] {
           pmemops->streaming_wr((void*)dst_addr, (void*)entry.addr,
                                 entry.bytes);
+        } else {
+          real_memcpy((void*)dst_addr, (void*)entry.addr, entry.bytes);
+          pmemops->flush((void*)dst_addr, entry.bytes);
         }
       } else if (entry.addr == 0) {
         break;

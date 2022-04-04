@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk btree map linkedlist_tx single_write
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -9,12 +9,12 @@ EXTRA_CXXFLAGS += -fno-omit-frame-pointer
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
-SUBDIRS := simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx kelly_hoh_code
+SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx kelly_hoh_code
 
 include ../common.make
 
 all: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
-	map
+	map map_pmdk
 
 map: btree_subdir
 	$(PUDDLES_MAKE) -C map
