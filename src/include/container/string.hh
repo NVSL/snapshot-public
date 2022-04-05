@@ -55,11 +55,7 @@ namespace libpuddles {
 
       bool operator==(const std::string &str) const;
       size_t size() const {
-        if (this->is_sso_used()) [[likely]] {
-          return this->content.sso.sz;
-        } else {
-          return this->content.non_sso.content.size() - 1;
-        }
+        return this->content.sso.sz & ~(1UL<<63);
       }
 
       void memcpyPuddles() const {}
@@ -74,19 +70,21 @@ namespace libpuddles {
   inline bool
   libpuddles::obj::string::operator==(const std::string &str) const {
     if (this->is_sso_used()) {
-      if (str.size() != this->size()) {
+      const auto str_sz = str.size();
+      if (str_sz != this->size()) {
         return false;
       } else {
         const char *memcmp_arg0 = str.c_str();
         const char *memcmp_arg1 = &this->content.sso.content[0];
-        return memcmp(memcmp_arg0, memcmp_arg1, str.size()) == 0;
+        // return memcmp(memcmp_arg0, memcmp_arg1, str.size()) == 0;
+        return 0 == std::char_traits<char>::compare(memcmp_arg0, memcmp_arg1, str_sz);
       }
     } else {
       if (str.size() != this->size()) return false;
 
       const char *memcmp_arg0 = str.c_str();
       const char *memcmp_arg1 = this->content.non_sso.content.raw_data();
-      return memcmp(memcmp_arg0, memcmp_arg1, str.size()) == 0;
+      return std::char_traits<char>::compare(memcmp_arg0, memcmp_arg1, str.size()) == 0;
     }
   }
   inline void obj::string::sso_init(const std::string &str) {

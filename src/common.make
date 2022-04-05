@@ -6,7 +6,7 @@ include $(SELF_DIR)vars.make
 include $(SELF_DIR)colors.make
 
 ifdef RELEASE
-CXXFLAGS    :=-std=gnu++20 -ggdb3 -O3 -march=native -fPIC -Wall -DNDEBUG
+CXXFLAGS    :=-std=gnu++20 -ggdb3 -O3 -g3 -march=native -fPIC -Wall -DNDEBUG
 CXXFLAGS    +=-fno-omit-frame-pointer
 else
 CXXFLAGS    :=-std=gnu++20 -ggdb3 -O0 -fPIC -Wall

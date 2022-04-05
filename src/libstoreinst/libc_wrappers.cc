@@ -193,11 +193,24 @@ int msync(void *__addr, size_t __len, int __flags) {
 
 
 int fsync(int __fd) __THROW {
-  DBGE << "Call to fsync intercepted: fsync(" << __fd << ")";
-  DBGE << "Unimplemented\n";
-  exit(1);
+  DBGH(1) << "Call to fsync intercepted: fsync(" << __fd << ")";
 
-  return real_fsync(__fd);
+  using nvsl::cxlbuf::mapped_addr;
+
+  if (mapped_addr.find(__fd) == mapped_addr.end()) {
+    DBGE << "File descriptor " << __fd << " not found in the mapped addresses"
+         << std::endl;
+    exit(1);
+  }
+
+  const auto address_range = mapped_addr[__fd];
+  
+  if (storeInstEnabled) {
+    return snapshot((void*)address_range.start, 
+                    address_range.end - address_range.start, MS_SYNC);
+  } else {
+    return real_fsync(__fd);
+  }
 }
 
 void *mremap (void *__addr, size_t __old_len, size_t __new_len,

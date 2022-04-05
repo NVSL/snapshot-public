@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-KYOTO_ROOT="/home/smahar/git/kyoto/"
+KYOTO_ROOT="/home/smahar/git/cxlbuf/vendor/kyoto/"
 DB_LOC="/mnt/pmem0/db.kct"
 DB_WC="/mnt/pmem0/db.*"
 OPS=100000
