@@ -30,7 +30,7 @@ namespace libpuddles {
           uint64_t is_sso_used : 1; /**< MSB of the sz field */
           char content[SSO_SZ];
           char null_term;
-        } sso;
+        } sso __attribute__((packed));
         content() {}
       } content;
       void sso_init(const std::string &str);
