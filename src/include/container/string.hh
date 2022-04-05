@@ -55,7 +55,8 @@ namespace libpuddles {
 
       bool operator==(const std::string &str) const;
       size_t size() const {
-        return this->content.sso.sz & ~(1UL<<63);
+        const uint64_t mask = ~(1UL<<63);
+        return this->content.sso.sz & mask;
       }
 
       void memcpyPuddles() const {}

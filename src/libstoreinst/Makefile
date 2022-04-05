@@ -21,7 +21,7 @@ include ../common.make
 all: $(TARGET).a $(TARGET).so
 
 $(TARGET).so: $(OBJECTS) $(DEPENDS) $(ARCHIVE_DEPENDS)
-	$(PUDDLES_CXX) $(CXXFLAGS)  -pthread $(INCLUDE) $(LDFLAGS) -shared \
+	$(PUDDLES_CXX) $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -shared \
 		-o $@ $(OBJECTS) $(LINKFLAGS)
 
 $(TARGET).a: $(OBJECTS)

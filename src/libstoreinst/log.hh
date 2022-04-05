@@ -31,7 +31,7 @@ namespace nvsl {
        */
       struct log_entry_t {
         // uint8_t is_disabled : 8;
-        uint64_t bytes : 8;
+        uint64_t bytes : 24;
         uint64_t addr : 56;
 
         NVSL_BEGIN_IGNORE_WPEDANTIC

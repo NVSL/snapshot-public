@@ -31,7 +31,9 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
 
-    NVSL_ASSERT((bytes % 8 == 0) and (bytes < 4096), "");
+    NVSL_ASSERT((bytes % 8 == 0) and (bytes < (1<<23)),
+                "Log request to location " + S((void*)start) + " for " +
+                S(bytes) + " bytes is invalid");
 
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
