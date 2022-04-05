@@ -14,6 +14,7 @@
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
 #include "nvsl/pmemops.hh"
+#include "bgflush.hh"
 // #include "libdsaemu.hh"
 
 nvsl::Counter *nvsl::cxlbuf::skip_check_count,

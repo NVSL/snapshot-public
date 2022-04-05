@@ -14,6 +14,7 @@
 #include "nvsl/pmemops.hh"
 #include "nvsl/stats.hh"
 #include "nvsl/trace.hh"
+#include "bgflush.hh"
 
 NVSL_DECL_ENV(CXLBUF_CRASH_ON_COMMIT);
 NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
@@ -90,6 +91,8 @@ extern "C" {
     cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
 
     printf("Address range = [%p:%p]\n", start_addr, end_addr);
+
+    nvsl::cxlbuf::bgflush::launch();
   }
   
   __attribute__((unused))

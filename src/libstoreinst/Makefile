@@ -12,7 +12,7 @@ DEPENDS := $(wildcard ../include/* ./*.hh ./*/*.hh)
 EXTRA_LDFLAGS := -L$(LIB_DIR) -Wl,-R$(LIB_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-Wl,--whole-archive $(ARCHIVE_DEPENDS) \
 	-Wl,--no-whole-archive
-EXTRA_LINKFLAGS +=-luuid
+EXTRA_LINKFLAGS +=-luuid -pthread
 TARGET := libstoreinst
 
 include ../common.make
@@ -21,7 +21,7 @@ include ../common.make
 all: $(TARGET).a $(TARGET).so
 
 $(TARGET).so: $(OBJECTS) $(DEPENDS) $(ARCHIVE_DEPENDS)
-	$(PUDDLES_CXX) $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -shared \
+	$(PUDDLES_CXX) $(CXXFLAGS)  -pthread $(INCLUDE) $(LDFLAGS) -shared \
 		-o $@ $(OBJECTS) $(LINKFLAGS)
 
 $(TARGET).a: $(OBJECTS)
