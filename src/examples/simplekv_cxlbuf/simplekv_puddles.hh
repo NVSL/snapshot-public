@@ -95,7 +95,9 @@ public:
         values[val] = buckets[index][i].second;
 
         if (persist) {
+#ifndef DONT_SYNC
           res->sync();
+#endif
         }
 
         return;
@@ -118,7 +120,9 @@ public:
     //   std::cout << buckets[index][pos].first<< std::endl;
     // }
     if (persist) {
+#ifndef DONT_SYNC      
       res->sync();
+#endif
     }
   }
 };

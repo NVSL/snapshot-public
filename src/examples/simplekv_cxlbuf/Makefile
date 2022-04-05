@@ -29,9 +29,16 @@ all:
 	$(PUDDLES_MAKE) simplekv_puddles_redir
 
 .PHONY: simplekv_puddles_redir
-simplekv_puddles_redir: simplekv_puddles simplekv_puddles.inst
+simplekv_puddles_redir: simplekv_puddles simplekv_puddles.inst simplekv_puddles.no_sync
 
 simplekv_puddles: simplekv_puddles.o
+	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
+
+%.o.no_sync: %.cc $(DEPS_DIR)/%.d | $(DEPS_DIR)
+	$(PUDDLES_CXX) -DDONT_SYNC $(INCLUDE) -mclwb -mavx -mavx2 -mavx512f -c $(CXXFLAGS)\
+		$(PUDDLES_CXXFLAGS) $< -MT $@ -o $@ -MMD -MP -MF $(DEPS_DIR)/$*.d
+
+simplekv_puddles.no_sync: simplekv_puddles.o.no_sync
 	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
 simplekv_puddles.inst: simplekv_puddles.cc
