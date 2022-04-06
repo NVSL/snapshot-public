@@ -7,8 +7,8 @@ all: bin lib | check_compiler
 
 .PHONY: vendor
 vendor:
-	$(PUDDLES_MAKE) -C vendor CC=$(ROOT_DIR)/bin/dclang \
-		CXX=$(ROOT_DIR)/bin/dclang++ \
+	$(PUDDLES_MAKE) -C vendor DD=$(ROOT_DIR)/bin/dclang \
+		DXX=$(ROOT_DIR)/bin/dclang++ \
 		DCLANG_LIBS_DIR="$(ROOT_DIR)/lib"
 
 release:

@@ -2146,7 +2146,6 @@ static int32_t proctran(const char* path, int64_t rnum, int32_t thnum, int32_t i
       err = true;
     }
   }
-  startTracking = 1;
   for (int32_t itcnt = 1; itcnt <= itnum; itcnt++) {
     oprintf("iteration %d updating:\n", itcnt);
     double stime = kc::time();
