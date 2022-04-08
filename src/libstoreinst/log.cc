@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "log.hh"
+#include "nvsl/clock.hh"
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
 #include "nvsl/pmemops.hh"
@@ -30,8 +31,9 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
+    perst_overhead_clk->tick();
 
-    NVSL_ASSERT((bytes % 8 == 0) and (bytes < (1<<23)),
+    NVSL_ASSERT((bytes < (1<<23)),
                 "Log request to location " + S((void*)start) + " for " +
                 S(bytes) + " bytes is invalid");
 
@@ -40,7 +42,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     
     /* Write to the persistent log and flush and fence it */
     log_entry.addr = (uint64_t)start;
-    log_entry.bytes = bytes/8;
+    log_entry.bytes = bytes;
 
     real_memcpy(&log_entry.val, start, bytes);
 
@@ -80,7 +82,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 #ifndef RELEASE
     ++*logged_check_count;
 #endif
-
+    
     /*
      * Align the log offset to the next cacheline.
      * This reduces the number of clwb needed
@@ -89,6 +91,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     // log_area->log_offset = ((log_area->log_offset+63)/64)*64;
 
     NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
+    perst_overhead_clk->tock();
   }
 }
 

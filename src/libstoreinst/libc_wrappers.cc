@@ -3,6 +3,7 @@
 #include "libc_wrappers.hh"
 #include "libstoreinst.hh"
 #include "log.hh"
+#include "nvsl/clock.hh"
 #include "nvsl/common.hh"
 #include "nvsl/envvars.hh"
 #include "nvsl/pmemops.hh"
@@ -49,6 +50,9 @@ std::unordered_map<int, cxlbuf::addr_range_t> cxlbuf::mapped_addr;
 
 /** @brief Bump allocator for the START_ADDR -> END_ADDR mmap tracking space **/
 void *cxlbuf::mmap_start = nullptr;
+
+nvsl::Clock *perst_overhead_clk;
+nvsl::Counter snapshots;
 
 void cxlbuf::init_dlsyms() {
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
@@ -133,25 +137,16 @@ void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
 void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
             __off_t __offset) __THROW {
   /* Read the file name for the fd */
-  auto fd_path = "/proc/self/fd/" + std::to_string(__fd);
-  constexpr size_t path_max = 4096;
-  char buf[path_max];
-  if (-1 == readlink(fd_path.c_str(), buf, path_max)) {
-    perror("readlink for mmap failed");
-    exit(1);
-  }
+  const auto fd_fname = nvsl::fd_to_fname(__fd);
 
-  DBGH(3) << "Mmaped fd " << __fd << " to path " << S(buf) << std::endl;
-
-  if (cxlbuf::mmap_start == nullptr) {
-    cxlbuf::mmap_start = start_addr;
-    assert(cxlbuf::mmap_start != nullptr);
-  }
-
-  cxlbuf::PmemFile pmemf(S(buf), __addr, __len);
+  cxlbuf::PmemFile pmemf(fd_fname, __addr, __len);
 
   // Check if the mmaped file is in /mnt/pmem0/
-  if (is_prefix("/mnt/pmem0/", buf)) {
+  if (is_prefix("/mnt/pmem0/", fd_fname)) {
+    if (cxlbuf::mmap_start == nullptr) {
+      cxlbuf::mmap_start = start_addr;
+    }
+    
     DBGH(1) << "Changing mmap address from " << __addr << " to "
             << cxlbuf::mmap_start << std::endl;
     __addr = cxlbuf::mmap_start;
@@ -165,7 +160,7 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
     pmemf.map_backing_file();
   }  
 
-  DBGH(1) << "Call to mmap intercepted: "
+  DBGH(1) << "Call to mmap intercepted (for " << fs::path(fd_fname) << "): "
           << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
           << std::endl;
 
@@ -248,6 +243,13 @@ int fdatasync (int __fildes) {
 
 __attribute__((unused))
 int snapshot(void *addr, size_t bytes, int flags) {
+  snapshots++;
+  if (nopMsync) [[unlikely]] {
+    return 0;
+  }
+
+  perst_overhead_clk->tick();
+  
   char *pm_back = (char*)0x20000000000;
 
   tls_log.flush_all();
@@ -264,12 +266,25 @@ int snapshot(void *addr, size_t bytes, int flags) {
       firstSnapshot = false;
 
       for (const auto &entry : cxlbuf::mapped_addr) {
+        const auto fname = fd_to_fname(entry.first);
+        
         if (entry.second.start <= (size_t)addr and entry.second.end > (size_t)addr) {
-          DBGH(2) << "Found the entry [" << entry.second.start << ", " << entry.second.end << "]" << std::endl;
+          DBGH(2) << "Found the entry " << entry.first << " (="
+                  << fs::path(fname) << ") [" << (void*)entry.second.start
+                  << ", " << (void*)entry.second.end << "]" << std::endl;
           
           void *dst = (void*)(entry.second.start + 0x10000000000);
           void *src = (void*)(entry.second.start);
-          real_memcpy(dst, src, entry.second.end - entry.second.start);
+
+
+          const size_t memcpy_sz = fname == "" 
+            ? (entry.second.end - entry.second.start)
+            : fs::file_size(fname);
+
+          /* Copy all the allocated bytes from the actual file to the backing */
+          DBGH(4) << "Calling real_memcpy(" << dst << ", " << src << ", "
+                  << memcpy_sz << ")" << std::endl;           
+          real_memcpy(dst, src, memcpy_sz);
           break;
         }
       }
@@ -300,7 +315,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
           str_wr_allowed = dst_addr % entry.bytes == 0;          
         }
 
-        if (entry.bytes < 256 and str_wr_allowed) [[likely]] {
+        if (entry.bytes >= 8 and entry.bytes < 256 and str_wr_allowed) [[likely]] {
           pmemops->streaming_wr((void*)dst_addr, (void*)entry.addr,
                                 entry.bytes);
         } else {
@@ -346,6 +361,8 @@ int snapshot(void *addr, size_t bytes, int flags) {
   }
 
   tls_log.clear();
+
+  perst_overhead_clk->tock();
   
   return 0;
 }

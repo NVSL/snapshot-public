@@ -14,6 +14,8 @@
 
 namespace nvsl {
   class PMemOps;
+  class Clock;
+  class Counter;
 }
 
 extern "C" {
@@ -36,6 +38,11 @@ extern "C" {
   extern nvsl::PMemOps *pmemops;
 
 }
+
 // TODO: Implement a better solution
 extern bool firstSnapshot;
 extern bool crashOnCommit;
+extern bool nopMsync;
+extern nvsl::Clock *perst_overhead_clk;
+extern size_t msyncSleepNs;
+extern nvsl::Counter snapshots;

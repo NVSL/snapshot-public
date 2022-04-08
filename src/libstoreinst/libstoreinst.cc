@@ -10,6 +10,7 @@
 #include "libstoreinst.hh"
 #include "log.hh"
 #include "nvsl/common.hh"
+#include "nvsl/clock.hh"
 #include "nvsl/envvars.hh"
 #include "nvsl/pmemops.hh"
 #include "nvsl/stats.hh"
@@ -20,11 +21,13 @@ NVSL_DECL_ENV(CXLBUF_CRASH_ON_COMMIT);
 NVSL_DECL_ENV(ENABLE_CHECK_MEMORY_TRACING);
 NVSL_DECL_ENV(PMEM_END_ADDR);
 NVSL_DECL_ENV(PMEM_START_ADDR);
-
+NVSL_DECL_ENV(CXLBUF_MSYNC_IS_NOP);
+NVSL_DECL_ENV(CXLBUF_MSYNC_SLEEP_NS);
 
 bool firstSnapshot = true;
 bool crashOnCommit = false;
-
+bool nopMsync = false;
+size_t msyncSleepNs = 0;
 
 extern "C" {
   void *start_addr, *end_addr = nullptr;
@@ -44,6 +47,7 @@ extern "C" {
     nvsl::cxlbuf::tx_log_count_dist->init("tx_log_count_dist", 
                             "Distribution of number of logs in a transaction",
                             5, 0, 30);
+    perst_overhead_clk = new nvsl::Clock();
   }
 
   void init_addrs() {
@@ -61,7 +65,7 @@ extern "C" {
     
     start_addr = (void*)std::stoull(start_addr_str, 0, 16);
     end_addr = (void*)std::stoull(end_addr_str, 0, 16);
-    
+
     assert(start_addr != nullptr);
     assert(end_addr != nullptr);
     
@@ -76,6 +80,17 @@ extern "C" {
 
   void init_envvars() {
     crashOnCommit = get_env_val(CXLBUF_CRASH_ON_COMMIT_ENV);
+    nopMsync = get_env_val(CXLBUF_MSYNC_IS_NOP_ENV);
+
+    const auto msyncSleepNsStr = get_env_str(CXLBUF_MSYNC_SLEEP_NS_ENV);
+    try {
+      msyncSleepNs = std::stod(msyncSleepNsStr);
+    } catch (const std::exception &e) {
+      msyncSleepNs = 0;
+    }
+
+    std::cerr << "nopMsync = " << nopMsync << std::endl;
+    std::cerr << "msyncSleepNS = " << msyncSleepNs << std::endl;
   }
 
   __attribute__((__constructor__))
@@ -114,9 +129,15 @@ extern "C" {
 
   __attribute__((destructor))
   void libstoreinst_dtor() {
+    perst_overhead_clk->reconcile();
+    
     std::cerr << "Summary:\n";
+    std::cerr << "snapshots = " << snapshots.value() << std::endl;      
     std::cerr << nvsl::cxlbuf::skip_check_count->str() << "\n";
     std::cerr << nvsl::cxlbuf::logged_check_count->str() << "\n";
     std::cerr << nvsl::cxlbuf::tx_log_count_dist->str() << "\n";
+
+    std::cerr << "Msync time:" << std::endl;
+    std::cerr << "perst_overhead = " << perst_overhead_clk->ns() << std::endl;
   }
 }

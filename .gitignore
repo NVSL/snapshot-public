@@ -1,3 +1,4 @@
+*.no_sync
 a.out
 *.log
 *.o

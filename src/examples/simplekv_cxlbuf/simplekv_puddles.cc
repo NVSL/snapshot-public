@@ -161,8 +161,18 @@ int main(int argc, char *argv[]) {
         }
       }
       clk.tock();
+
+      const auto msyncSleepNsStr = get_env_str("CXLBUF_MSYNC_SLEEP_NS");
+      auto msyncSleepNs = 0;
+
+      try {
+        msyncSleepNs = std::stoull(msyncSleepNsStr);
+      } catch (const std::exception &e) {}
+
       std::cout << clk.summarize() << std::endl;
       std::cout << "Done." << std::endl;
+      std::cout << "excluded = " << clk.ns() << std::endl;
+      std::cout << "ns = " << clk.ns() + msyncSleepNs << std::endl;
     } else {
       show_usage(argv);
       return 1;

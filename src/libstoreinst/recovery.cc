@@ -186,9 +186,35 @@ bool cxlbuf::PmemFile::has_backing_file() {
 
 void cxlbuf::PmemFile::create_backing_file_internal() {
   const auto bfname = this->get_backing_fname();
-  DBGH(2) << "Creating backing file...";
-  fs::copy_file(this->path, bfname);
-  DBG << "done" << std::endl;
+
+  /* Check if original file size if 0, in that case allocate the file of the
+   * same size as the mapping.
+   *
+   * TODO: This should be done by intercepting calls to fallocate and friends
+   */
+  if (fs::file_size(this->path) == 0) {
+    DBGH(2) << "Creating backing file by allocating " << this->len << " bytes"
+            << std::endl;
+    
+    int fd = open(bfname.c_str(), O_CREAT | O_RDWR, 0666);
+    if (fd == -1) {
+      DBGE << "Unable to open file descriptor for the backing file" << std::endl;
+      DBGE << PSTR();
+      exit(1);
+    }
+
+    NVSL_ASSERT(lseek(fd, this->len + 1, SEEK_SET) == (off_t)(this->len + 1),
+                "lseek for backing file failed");
+    NVSL_ASSERT(1 == write(fd, "\0", 1), "write to backing file failed");
+    close(fd);
+
+    DBGH(3) << "New backing file size: "
+            << fs::file_size(this->get_backing_fname()) << std::endl;
+  } else {
+    DBGH(2) << "Creating backing file of size by copying...";
+    fs::copy_file(this->path, bfname);
+    DBG << "done" << std::endl;
+  }
 }
 
 void cxlbuf::PmemFile::create_backing_file() {
@@ -239,17 +265,30 @@ void cxlbuf::PmemFile::map_backing_file() {
     exit(1);
   }
   
-  const int bck_flags = MAP_SHARED_VALIDATE | MAP_SYNC | MAP_FIXED_NOREPLACE;
-  const void *mbck_addr = real_mmap(bck_addr, this->len, bck_flags,
-                                    PROT_READ | PROT_WRITE, bck_fd, 0);
+  int bck_flags = 0;
+  bck_flags |= MAP_SHARED_VALIDATE;
+  bck_flags |= MAP_SYNC;
+  
+  DBGH(3) << "Calling mmap for backing: "
+          << mmap_to_str(bck_addr, this->len, PROT_READ | PROT_WRITE, bck_flags, 
+                         bck_fd, 0)
+          << std::endl;
+  void *mbck_addr = real_mmap(bck_addr, this->len, PROT_READ | PROT_WRITE,
+                                    MAP_SHARED_VALIDATE | MAP_SYNC, bck_fd, 0);
 
   if (mbck_addr == (void*)-1) {
     DBGE << "Unable to map backing file" << std::endl;
+    DBGE << PSTR() << std::endl;
     exit(1);
   } else {
     DBGH(2) << "Backing file " << bfname << " for " << fs::path(this->path)
             << " mapped at address " << mbck_addr << std::endl;
-  }  
+  }
+
+  DBGH(4) << "Trying to write to the backing file...";
+  *(char*)mbck_addr = 1;
+  DBGH(4) << "done" << std::endl;
+
 }
 
 cxlbuf::PmemFile::PmemFile(const fs::path &path, void* addr, size_t len)
@@ -312,6 +351,7 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd, off_t off
       DBGE << "Asked " << this->addr << ", got " << result << std::endl;
       perror("mmap:");
       system(("cat /proc/" + std::to_string(getpid()) + "/maps >&2").c_str());
+      system(("ls -lah /proc/" + std::to_string(getpid()) + "/fd >&2").c_str());
       exit(1);
     }
   } else {
