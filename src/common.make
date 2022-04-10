@@ -7,7 +7,7 @@ include $(SELF_DIR)colors.make
 
 ifdef RELEASE
 CXXFLAGS    :=-std=gnu++20 -ggdb3 -O3 -g3 -march=native -fPIC -Wall -DNDEBUG
-CXXFLAGS    +=-fno-omit-frame-pointer
+CXXFLAGS    +=-fomit-frame-pointer
 else
 CXXFLAGS    :=-std=gnu++20 -ggdb3 -O0 -fPIC -Wall
 CXXFLAGS    += -fno-omit-frame-pointer -Werror

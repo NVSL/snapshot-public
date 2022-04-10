@@ -23,7 +23,7 @@ dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
 single_write:
-	$(@printf "lakdf")../storeinst-pass/dclang++ -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed -std=c++20 -ldl -lstoreinst $@.cc -o $@
+	../storeinst-pass/dclang++ -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed -std=c++20 -ldl -lstoreinst $@.cc -o $@
 
 cat-demo: cat-demo.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)

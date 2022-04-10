@@ -42,7 +42,7 @@ simplekv_puddles.no_sync: simplekv_puddles.o.no_sync
 	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
 simplekv_puddles.inst: simplekv_puddles.cc
-	$(PUDDLES_DXX) $(INCLUDE) $(CXXFLAGS) $(LDFLAGS) -luuid -lpthread -mclwb -ldl  $^ -o $@
+	$(PUDDLES_DXX) $(INCLUDE) -flto $(CXXFLAGS) $(LDFLAGS) -luuid -lpthread -mclwb -ldl  $^ -o $@
 
 clean: clean_deps
 	-rm -f *.a *.o *.bc *.so *.inst simplekv_puddles
