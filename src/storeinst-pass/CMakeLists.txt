@@ -34,9 +34,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb")
 #===============================================================================
 # 3. ADD THE TARGET
 #===============================================================================
-add_library(storeinst SHARED storeinst.cc)
+add_library(storeinstpass SHARED storeinst.cc)
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
-target_link_libraries(storeinst
+target_link_libraries(storeinstpass
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")

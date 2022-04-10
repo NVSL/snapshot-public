@@ -10,8 +10,11 @@ import subprocess
 import sys
 import os
 
-PASS_SO = '/home/smahar/git/cxlbuf/src/storeinst-pass/build/libstoreinst.so'
-
+PASS_SO = ""
+if 'DCLANG_LIBS_DIR' in os.environ:
+    PASS_SO = f'{os.environ["DCLANG_LIBS_DIR"]}/libstoreinstpass.so'
+else:
+    raise RuntimeError("DCLANG_LIBS_DIR not set")
 
 def get_bins(llvm_dir):
     cxx = os.path.join(llvm_dir, "bin/clang++")

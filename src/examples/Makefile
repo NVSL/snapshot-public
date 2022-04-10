@@ -9,7 +9,7 @@ EXTRA_CXXFLAGS += -fno-omit-frame-pointer
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
-SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx kelly_hoh_code
+SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx
 
 include ../common.make
 

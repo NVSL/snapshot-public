@@ -5,3 +5,52 @@
 - Boost.Config (included)
 - Boost.Move (included)
 - nvsl.cpp-common (included)
+
+** Build
+To build the project:
+#+begin_src shell
+  make -j$(nproc)
+#+end_src
+
+To build the release (optimized) version:
+#+begin_src shell
+  make -j$(nproc) release
+#+end_src
+
+Enabling verbose mode for debugging compiler flags:
+#+begin_src shell
+  V=1 make # or V=1 make release
+#+end_src
+
+** Tests
+To run tests:
+#+begin_src shell
+  make release -j$(nproc)
+  make tests
+#+end_src
+
+** Enivronment variables
+
+**** Configuration
+| Environment variable  | Possible values | Comments                                                                                   |
+|-----------------------+-----------------+--------------------------------------------------------------------------------------------|
+| PMEM_START_ADDR       | addr            | Marks the start of the tracking region, files on pmem will mount starting at this address. |
+| PMEM_END_ADDR         | addr            | Marks the end of the tracking region                                                       |
+| CXLBUF_MSYNC_IS_NOP   | {1,0,-}         | Disables persistency of msync and converts it into a NOP                                   |
+| CXLBUF_MSYNC_SLEEP_NS | {val,-}         | Add a fixed sleep to msync to simulate crash consistency behavior                          |
+
+**** Debugging
+| Environment variable | Possible values        | Comments                                                                           |
+|----------------------+------------------------+------------------------------------------------------------------------------------|
+| NVSL_NO_STACKTRACE   | {1,0,-}                | Disables stack trace in res_t and mres_t                                           |
+| NVSL_LOG_LEVEL       | [0-4]                  | Controls the volume of debug logging, 0 -> no log output, 4 -> most verbose output |
+| NVSL_LOG_WILDCARD    | {"", wildcard pattern} | Unless empty, applies filter on log using their caller's function name             |
+
+**** Crash Consistency
+| Environment variable   | Possible values | Comments                                             |
+|------------------------+-----------------+------------------------------------------------------|
+| CXLBUF_CRASH_ON_COMMIT | {1,0,-}         | Crash right before committing the transaction        |
+| NVSL_FORCE_MSYNC       | {1,0,-}         | Uses msync for persisting data                       |
+| NVSL_FORCE_CLWB        | {1,0,-}         | Uses clwb (if supported) for persisting data         |
+| NVSL_FORCE_CLFLUSH_OPT | {1,0,-}         | Uses clflushopt (if supported) for persisting data   |
+| NVSL_FORCE_NO_PERSIST  | {1,0,-}         | All persistent operations (flush/drain) are disabled |

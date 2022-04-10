@@ -7,6 +7,8 @@ jobs:
       - image: cimg/base:2021.04
     environment:
       CXX: g++-10
+      CC: gcc-10
+      LLVM_DIR: /usr/lib/llvm-13/
     steps:
       - checkout
       - run: 
@@ -18,22 +20,18 @@ jobs:
             printf "deb http://apt.llvm.org/focal/ llvm-toolchain-focal main\ndeb-src http://apt.llvm.org/focal/ llvm-toolchain-focal main\ndeb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main\ndeb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main\ndeb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main\ndeb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main" | sudo tee /etc/apt/sources.list.d/llvm.list
             sudo apt-get update
             sudo apt-get install build-essential clang-13++ make
-            sudo apt-get install libboost-dev uuid-dev libboost-system-dev
+            sudo apt-get install uuid-dev libboost-dev libboost-system-dev
             sudo apt-get install libpmem-dev libpmemobj-dev libpmemobj-cpp-dev libpmempool-dev pmdk-tools
             sudo apt-get install libarchive-dev
             sudo apt-get install bsdmainutils g++-10 gcc-10 cmake python3
             alias python=python3
-      # - run: 
-      #     name: "Setup files"
-      #     command: |
-      #       pmempool create obj --layout="cmap_string" --size 1G /tmp/opened_puddles
-      #       pmempool create obj --layout="cmap_string" --size 1G /tmp/log_spaces
       - run: 
           name: "Build and test"
           command: |
             git submodule update --init
-            make -j2
-            make test -j2
+            mkdir -p lib
+            make -j100 DCLANG_LIBS_DIR=${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}/lib
+            make tests
 
 # Orchestrate our job run sequence
 workflows:

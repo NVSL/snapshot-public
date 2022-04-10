@@ -22,6 +22,7 @@ libstoreinst:
 
 storeinst-pass:
 	$(PUDDLES_MAKE) -C storeinst-pass
+	$(PUDDLES_LN) -fs ../src/storeinst-pass/build/libstoreinstpass.so ../lib/libstoreinstpass.so
 
 libpmbuffer:
 	$(PUDDLES_MAKE) -C libpmbuffer
