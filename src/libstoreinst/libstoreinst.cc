@@ -53,13 +53,13 @@ extern "C" {
   void init_addrs() {
     const auto start_addr_str = get_env_str(PMEM_START_ADDR_ENV);
     if (start_addr_str == "") {
-      std::cerr << "PMEM_START_ADDR not set" << std::endl;
+      DBGE << "PMEM_START_ADDR not set" << std::endl;
       exit(1);
     }
 
     const auto end_addr_str = get_env_str(PMEM_END_ADDR_ENV);
     if (end_addr_str == "") {
-      std::cerr << "PMEM_END_ADDR not set" << std::endl;
+      DBGE << "PMEM_END_ADDR not set" << std::endl;
       exit(1);
     }
     
@@ -70,8 +70,6 @@ extern "C" {
     assert(end_addr != nullptr);
     
     assert(start_addr < end_addr);
-
-    printf("Values = %s, %s\n", start_addr_str.c_str(), end_addr_str.c_str());
   }
 
   void init_pmemops() {
@@ -102,10 +100,10 @@ extern "C" {
     init_envvars();
 
     traceStream = new std::ofstream("/tmp/stacktrace");
-
     cxlModeEnabled = get_env_val("CXL_MODE_ENABLED");
 
-    printf("Address range = [%p:%p]\n", start_addr, end_addr);
+    DBGH(1) << "Address range = [" << start_addr << ", " << end_addr << "]"
+            << std::endl;
 
     nvsl::cxlbuf::bgflush::launch();
   }

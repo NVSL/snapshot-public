@@ -245,7 +245,6 @@ int main(int argc, char *argv[]) {
   // register_filt_fun(typeid(linkedlist_t), linkedlist_t::filter);
 
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
-  printf("Started\n");
 
   auto res = new mmf(bip::open_or_create, args.puddle_path.c_str(),
                      MIN_POOL_SZ*1000);

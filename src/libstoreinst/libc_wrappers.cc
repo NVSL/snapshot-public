@@ -56,7 +56,6 @@ nvsl::Counter snapshots;
 
 void cxlbuf::init_dlsyms() {
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
-  printf("dlsym for memcpy = %p at %p\n", (void*)real_memcpy, (void*)&real_memcpy);
   if (real_memcpy == nullptr) {
     DBGE << "dlsym failed for memcpy: %s\n" << std::string(dlerror()) << "\n";
     exit(1);
@@ -337,10 +336,10 @@ int snapshot(void *addr, size_t bytes, int flags) {
     cxlbuf::tx_log_count_dist->add(total_proc);
 #endif
 
-    // if (crashOnCommit) [[unlikely]] {
-      // DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)" << std::endl;
-      // exit(1);
-    // }
+    if (crashOnCommit) [[unlikely]] {
+      DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)" << std::endl;
+      exit(1);
+    }
 
     /* Update the state to drop the log and drain all the updates to the backing
        file */

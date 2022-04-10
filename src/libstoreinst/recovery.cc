@@ -142,7 +142,7 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
       }
 
       cur_off += entry->bytes + sizeof(log_entry_t);
-      cur_off = ((cur_off + 63) / 64) * 64;
+      // cur_off = ((cur_off + 63) / 64) * 64;
 
       DBGH(4) << "New offset = " << cur_off << std::endl;
     }
