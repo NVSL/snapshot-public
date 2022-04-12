@@ -144,13 +144,17 @@ class Fig(object):
         
         self.ax = ax
 
-    def get_kwargs(**kwargs):
-        return {**kwargs, **{
+    def get_kwargs(bar=True, **kwargs):
+        result = {
             'fontsize': Fig.fontsize_gbl, 
             'figsize': Fig.figsize_gbl,
-            'edgecolor': 'black',
             'zorder': 3,
-        }}
+        }
+        
+        if bar:
+            result['edgecolor'] = 'black'
+            
+        return {**kwargs, **result}
 
     def fmt_grid(self, axis='both', **kwargs):
         self.ax.grid(axis=axis, **kwargs)

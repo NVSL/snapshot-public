@@ -1,3 +1,4 @@
+.make.tmp
 *.no_sync
 a.out
 *.log

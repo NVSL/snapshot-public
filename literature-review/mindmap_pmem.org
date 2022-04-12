@@ -30,6 +30,9 @@ DUDETM like
 *** DUDETM: Building Durable Transactions with Decoupling for Persistent Memory
 
 ** DUDETM: Building Durable Transactions with Decoupling for Persistent Memory
+*** Persistency for synchronization-free regions
+*** Mirror: Making Lock-Free Data Structures Persistent
+*** NVTraverse: In NVRAM Data Structures, the Destination Is More Important Than the Journey
 ** Atomic In-place Updates for Non-volatile Main Memories with Kamino-Tx
 Shadow-paging like
 *** Durable Transactional Memory Can Scale with Timestone
