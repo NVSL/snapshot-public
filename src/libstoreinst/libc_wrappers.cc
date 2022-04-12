@@ -359,8 +359,8 @@ int snapshot(void *addr, size_t bytes, int flags) {
     tls_log.set_state(cxlbuf::Log::State::EMPTY);
   } else {
     DBGH(1) << "Calling real msync" << std::endl;
-    
-    void *pg_aligned = (void*)(((size_t)addr>>12)<<12);
+
+    void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
 
     const int mret = real_msync(pg_aligned, bytes, flags);
 
