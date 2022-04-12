@@ -5,6 +5,8 @@ ROOT_DIR := $(realpath $(dir $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))..)
 include $(SELF_DIR)vars.make
 include $(SELF_DIR)colors.make
 
+CONFIG_FILE ?= $(SELF_DIR)../make.config
+
 ifdef RELEASE
 CXXFLAGS    :=-std=gnu++20 -ggdb3 -O3 -g3 -march=native -fPIC -Wall -DNDEBUG
 CXXFLAGS    +=-fomit-frame-pointer
@@ -16,6 +18,21 @@ endif
 ifdef DEBUG_BUILD
 CXXFLAGS    += -v
 endif
+
+
+# Format the make.config file and import it if it's out of date
+$(shell \
+if [ ! -f "$(SELF_DIR).make.tmp" ]; then \
+	cat $(CONFIG_FILE) | grep -v '^#' | egrep '(=y)' | sed 's|=y||g' | sed 's|^|CXXFLAGS += -D|g' > $(SELF_DIR)/.make.tmp;\
+fi;\
+)
+$(shell \
+if [ "$(CONFIG_FILE)" -nt "$(SELF_DIR).make.tmp" ]; then \
+	cat $(CONFIG_FILE) | grep -v '^#' | egrep '(=y)' | sed 's|=y||g' | sed 's|^|CXXFLAGS += -D|g' > $(SELF_DIR)/.make.tmp;\
+fi;\
+)
+include $(SELF_DIR).make.tmp
+
 
 CXXFLAGS    += -Wpedantic
 CXXFLAGS    += $(EXTRA_CXXFLAGS) $(PUDDLE_CXXFLAGS)

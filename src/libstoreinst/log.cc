@@ -16,7 +16,11 @@
 #include "nvsl/utils.hh"
 #include "nvsl/pmemops.hh"
 #include "bgflush.hh"
-// #include "libdsaemu.hh"
+
+#if defined LOG_FORMAT_VOLATILE && defined LOG_FORMAT_NON_VOLATILE
+#error "Incompatible flags: LOG_FORMAT_VOLATILE and LOG_FORMAT_NON_VOLATILE enabled"
+#endif
+
 
 nvsl::Counter *nvsl::cxlbuf::skip_check_count,
   *nvsl::cxlbuf::logged_check_count;
@@ -26,8 +30,8 @@ extern nvsl::PMemOps *pmemops;
 using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
-  auto &log_entry = *(log_entry_t*)((char*)log_area->entries
-                                    + log_area->log_offset);
+  auto &log_entry = *RCast<log_entry_t *>(RCast<uint8_t *>(log_area->content)
+                                          + log_area->log_offset);
     
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
@@ -37,14 +41,16 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
                 "Log request to location " + S((void*)start) + " for " +
                 S(bytes) + " bytes is invalid");
 
+#ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
+#endif
     
     /* Write to the persistent log and flush and fence it */
     log_entry.addr = (uint64_t)start;
     log_entry.bytes = bytes;
 
-    real_memcpy(&log_entry.val, start, bytes);
+    real_memcpy(&log_entry.content, start, bytes);
 
     const size_t entry_sz = sizeof(log_entry_t) + bytes;
     log_area->log_offset += entry_sz;
@@ -73,7 +79,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
         
         /* FLush all but the last cacheline. Last (partially written) cacheline
          * will be flushed with the next entry or on snapshot */
-        pmemops->flush((char*)log_area + last_flush_offset,
+        pmemops->flush(RCast<uint8_t *>(log_area) + last_flush_offset,
                        (cls_to_flush - 1) * 64);
         last_flush_offset += (cls_to_flush - 1) * 64;
       }
@@ -98,7 +104,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 
 void cxlbuf::Log::flush_all() const {
   if (this->last_flush_offset != this->log_area->log_offset) {
-    const void* start = (char*)log_area->entries + last_flush_offset;
+    const void* start = (char*)log_area->content + last_flush_offset;
     const size_t len = this->log_area->log_offset - this->last_flush_offset;
 
     DBGH(3) << "Flushing unflushed " << len << " bytes" << std::endl; 
@@ -189,7 +195,9 @@ void cxlbuf::Log::init_thread_buf() {
 }
 
 cxlbuf::Log::Log() {
+#ifdef LOG_FORMAT_VOLATILE
   entries.reserve(Log::MAX_ENTRIES);
+#endif
 
   this->init_dirs();
   this->init_thread_buf();

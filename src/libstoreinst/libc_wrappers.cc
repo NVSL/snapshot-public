@@ -247,7 +247,9 @@ int snapshot(void *addr, size_t bytes, int flags) {
     return 0;
   }
 
+#ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tick();
+#endif
   
   char *pm_back = (char*)0x20000000000;
 
@@ -296,7 +298,15 @@ int snapshot(void *addr, size_t bytes, int flags) {
     size_t start = (uint64_t)addr, end = (uint64_t)addr+bytes;
     size_t diff = end - start;
 
-    for (auto &entry : tls_log.entries) {
+#if LOG_FORMAT_VOLATILE
+    const auto &log_list = tls_log.entries;
+#elif LOG_FORMAT_NON_VOLATILE
+    const auto &log_list = *tls_log.log_area;
+#else
+    #error "Log format needs to be volatile or non-volatile."
+#endif
+
+    for (const auto &entry : log_list) {
       /* Copy the logged location to the backing store if in range of
          snapshot */
       if (entry.addr - start <= diff) [[likely]] {
@@ -304,21 +314,21 @@ int snapshot(void *addr, size_t bytes, int flags) {
         const size_t dst_addr = (size_t)(pm_back + offset);
         
         DBGH(4) << "Copying " << entry.bytes << " bytes from "
-                << (void*)entry.addr << " -> " << (void*)dst_addr
+                << (void*)(0UL + entry.addr) << " -> " << (void*)dst_addr
                 << std::endl;
 
         /* Streaming write is only allowed if the write size is a power of two
            (popcount == 1) and dest address is aligned at entry.bytes */
         bool str_wr_allowed = false;
-        if (__builtin_popcount(entry.bytes) == 1) {
+        if (std::popcount(entry.bytes) == 1) {
           str_wr_allowed = dst_addr % entry.bytes == 0;          
         }
 
         if (entry.bytes >= 8 and entry.bytes < 256 and str_wr_allowed) [[likely]] {
-          pmemops->streaming_wr((void*)dst_addr, (void*)entry.addr,
+          pmemops->streaming_wr((void*)dst_addr, (void*)(0UL + entry.addr),
                                 entry.bytes);
         } else {
-          real_memcpy((void*)dst_addr, (void*)entry.addr, entry.bytes);
+          real_memcpy((void*)dst_addr, (void*)(0UL + entry.addr), entry.bytes);
           pmemops->flush((void*)dst_addr, entry.bytes);
         }
       } else if (entry.addr == 0) {
@@ -336,10 +346,12 @@ int snapshot(void *addr, size_t bytes, int flags) {
     cxlbuf::tx_log_count_dist->add(total_proc);
 #endif
 
+#ifdef CXLBUF_TESTING_GOODIES
     if (crashOnCommit) [[unlikely]] {
       DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)" << std::endl;
       exit(1);
     }
+#endif // CXLBUF_TESTING_GOODIES
 
     /* Update the state to drop the log and drain all the updates to the backing
        file */
@@ -361,7 +373,9 @@ int snapshot(void *addr, size_t bytes, int flags) {
 
   tls_log.clear();
 
+#ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tock();
+#endif // CXLBUF_TESTING_GOODIES
   
   return 0;
 }

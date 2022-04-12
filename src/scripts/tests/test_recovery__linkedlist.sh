@@ -7,7 +7,15 @@ if [ -z "$CXLBUF_RUNNING_TESTS" ]; then
     exit 1
 fi
 
+trl_remake() {
+    clear_config >/dev/null 2>&1
+    set_env CXLBUF_TESTING_GOODIES=y
+    recompile >/dev/null 2>&1    
+}
+
 test_recovery_linkedlist() {
+    trl_remake
+    
     BIN="${ROOT_DIR}/src/examples/linkedlist_tx/linkedlist_tx"
     POOL="${PMEM_LOC}/linkedlist"
     rm -rf "$LOG_LOC" "$POOL"*
@@ -28,6 +36,8 @@ suite_addTest test_recovery_linkedlist
 
 
 test_recovery_linkedlist_multiple() {
+    trl_remake
+
     rm -rf "$LOG_LOC" "${PMEM_LOC}/"linkedlist*
 
     printf "> Creating a pool\n"

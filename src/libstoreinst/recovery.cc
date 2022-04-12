@@ -57,7 +57,7 @@ std::vector<std::string> cxlbuf::PmemFile::needs_recovery() const {
                   << (int)log_ptr->state << std::endl;
         }
 
-        int mu_ret = munmap(log_ptr, fs::file_size(lfname));
+        int mu_ret = real_munmap(log_ptr, fs::file_size(lfname));
 
         if (mu_ret == -1) {
           DBGE << "munmap for log failed" << std::endl;
@@ -119,20 +119,20 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
     using log_entry_t = Log::log_entry_t;
     size_t cur_off = 0;
     while (cur_off < log_ptr->log_offset) {
-      log_entry_t *entry = (log_entry_t*)&(((char*)log_ptr->entries)[cur_off]);
+      log_entry_t *entry = (log_entry_t*)&(((char*)log_ptr->content)[cur_off]);
 
       DBGH(4) << "Checking entry (" << entry->addr << ", " << entry->bytes
               << ")" << std::endl;
       
       if (((size_t)addr <= entry->addr) and
           (entry->addr < ((size_t)addr + this->len)) /*and entry->is_disabled != 1*/) {
-        // entry->is_disabled = 1;
+
         const auto dst_addr = (void*)(size_t)entry->addr;
 
         DBGH(4) << "Recovering location " << dst_addr << "...";
 
         // Write, flush and drain
-        real_memcpy(dst_addr, entry->val, entry->bytes);
+        real_memcpy(dst_addr, entry->content, entry->bytes);
         pmemops->flush(dst_addr, entry->bytes);
         pmemops->drain();
 
@@ -142,7 +142,6 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
       }
 
       cur_off += entry->bytes + sizeof(log_entry_t);
-      // cur_off = ((cur_off + 63) / 64) * 64;
 
       DBGH(4) << "New offset = " << cur_off << std::endl;
     }

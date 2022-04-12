@@ -6,8 +6,13 @@ DIR="$(dirname $(readlink -f "$0"))"
 ROOT_DIR="$(readlink -f "$DIR/../../../")"
 PMEM_LOC="${PMEM_LOC:-/mnt/pmem0/}"
 LOG_LOC="${PMEM_LOC}/cxlbuf_logs"
+CONFIG_FILE=`mktemp`
 
 beginswith() { case $2 in "$1"*) true;; *) false;; esac; }
+
+clear_config() {
+    echo '' > "$CONFIG_FILE"
+}
 
 echo "# Found following tests file: "
 suite() {
@@ -15,6 +20,20 @@ suite() {
         echo "#   $f"
         . "$f"
     done
+}
+
+
+set_env() {
+    if [ -s "$CONFIG_FILE" ]; then
+        cp "$ROOT_DIR/make.config" "$CONFIG_FILE"
+    fi
+
+    echo "$1" >> "$CONFIG_FILE"
+}
+
+recompile() {
+    make clean -C "${ROOT_DIR}"
+    make release -j100 -C "${ROOT_DIR}" CONFIG_FILE="${CONFIG_FILE}"
 }
 
 echo '--------------'
