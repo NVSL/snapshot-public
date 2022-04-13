@@ -17,6 +17,10 @@ export CXL_MODE_ENABLED=0
 set -e
 # set -x
 
+check_bin "${LL_ROOT}/${LL_PMDK}" "-O3"
+check_bin "${LL_ROOT}/${LL_CXLBUF}" "-O3"
+check_bin "${LL_ROOT}/${LL_CXLBUF}" "-D RELEASE"
+
 execute() {
     OP="$1"    # Operation to perform
     OCCUR="$2" # Only use the n'th occurrence
