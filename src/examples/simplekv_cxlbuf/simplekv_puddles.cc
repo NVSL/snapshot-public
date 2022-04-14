@@ -6,12 +6,12 @@
  * values, string as a key and array to hold buckets
  */
 
+#include <fcntl.h>
 #include <fstream>
 #include <stdexcept>
-#include <vector>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
+#include <vector>
 
 #include "common.hh"
 #include "libstoreinst.hh"
@@ -23,11 +23,11 @@
 constexpr size_t MIN_POOL_SZ = (20 * 1024 * 1024);
 size_t cur_ator_head = 0;
 
-using kv_type = simple_kv<int, 10000>;
+using kv_type = simple_kv<int, 1000>;
 
 void *alloc(void *region, size_t bytes) {
   cur_ator_head += bytes;
-  return (char*)region + bytes;
+  return (char *)region + bytes;
 }
 
 __attribute__((__annotate__(("do_not_auto_log"))))
@@ -51,14 +51,14 @@ int main(int argc, char *argv[]) {
   const char *path = argv[1];
 
   try {
-    auto res = new reservoir_t(nvsl::S(path), MIN_POOL_SZ*10);
+    auto res = new reservoir_t(nvsl::S(path), MIN_POOL_SZ * 10);
 
     auto root = res->allocate_root<kv_type>();
 
-    std::cout << "Root at " << (void*)root << std::endl;
-    root->init(res, MIN_POOL_SZ*10);
+    std::cout << "Root at " << (void *)root << std::endl;
+    root->init(res, MIN_POOL_SZ * 10);
     if (root == nullptr) {
-        msync(root, MIN_POOL_SZ*10, MS_SYNC);
+      msync(root, MIN_POOL_SZ * 10, MS_SYNC);
     }
 
     if (std::string(argv[2]) == "get" && argc == 4) {
@@ -127,8 +127,8 @@ int main(int argc, char *argv[]) {
       std::cout << "| Executing load trace" << std::endl;
       size_t iter = 0;
       for (auto &key : load_keys) {
-        if (iter++%100000 == 0) {
-          std::cout << (iter*100)/load_keys.size() << "%...";
+        if (iter++ % 100000 == 0) {
+          std::cout << (iter * 100) / load_keys.size() << "%...";
           std::flush(std::cout);
         }
         root->put(key, value, false);
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
       startTracking = true;
       root->put("a", 0, true);
       msync(root, 1024, MS_SYNC);
-      
+
       size_t run_size = run_ops.size();
       clk.tick();
       volatile size_t result = 0;
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
             // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
           } else if (run_ops[i] == "Read") {
             try {
-            result = result + root->get(run_keys[i]);
+              result = result + root->get(run_keys[i]);
             } catch (const std::exception &e) {
               std::cout << "run = " << run << " i = " << i << std::endl;
               exit(1);
@@ -167,7 +167,8 @@ int main(int argc, char *argv[]) {
 
       try {
         msyncSleepNs = std::stoull(msyncSleepNsStr);
-      } catch (const std::exception &e) {}
+      } catch (const std::exception &e) {
+      }
 
       std::cout << clk.summarize() << std::endl;
       std::cout << "Done." << std::endl;

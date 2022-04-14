@@ -118,7 +118,9 @@ __attribute__((__constructor__)) void libstoreinst_ctor() {
   DBGH(1) << "Address range = [" << start_addr << ", " << end_addr << "]"
           << std::endl;
 
+#ifdef USE_BGFLUSH
   nvsl::cxlbuf::bgflush::launch();
+#endif
 }
 
 __attribute__((unused)) void checkMemory(void *ptr) {
