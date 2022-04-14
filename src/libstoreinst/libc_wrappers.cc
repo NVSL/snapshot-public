@@ -240,8 +240,7 @@ int fdatasync (int __fildes) {
   return result;
 }
 
-__attribute__((unused))
-int snapshot(void *addr, size_t bytes, int flags) {
+__attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   snapshots++;
   if (nopMsync) [[unlikely]] {
     return 0;
@@ -250,15 +249,20 @@ int snapshot(void *addr, size_t bytes, int flags) {
 #ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tick();
 #endif
-  
-  char *pm_back = (char*)0x20000000000;
+
+#ifdef TRACE_LOG_MSYNC
+  const std::string snapshot_msg = "snapshot\n";
+  write(trace_fd, snapshot_msg.c_str(), strlen(snapshot_msg.c_str()));
+#endif
+
+  char *pm_back = (char *)0x20000000000;
 
   tls_log.flush_all();
 
   /* Drain all the stores to the log and update its state before modifying the
      backing file */
   tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
-  
+
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
   if (storeInstEnabled) [[likely]] {
@@ -268,34 +272,35 @@ int snapshot(void *addr, size_t bytes, int flags) {
 
       for (const auto &entry : cxlbuf::mapped_addr) {
         const auto fname = fd_to_fname(entry.first);
-        
-        if (entry.second.start <= (size_t)addr and entry.second.end > (size_t)addr) {
-          DBGH(2) << "Found the entry " << entry.first << " (="
-                  << fs::path(fname) << ") [" << (void*)entry.second.start
-                  << ", " << (void*)entry.second.end << "]" << std::endl;
-          
-          void *dst = (void*)(entry.second.start + 0x10000000000);
-          void *src = (void*)(entry.second.start);
 
+        if (entry.second.start <= (size_t)addr and
+            entry.second.end > (size_t)addr) {
+          DBGH(2) << "Found the entry " << entry.first
+                  << " (=" << fs::path(fname) << ") ["
+                  << (void *)entry.second.start << ", "
+                  << (void *)entry.second.end << "]" << std::endl;
 
-          const size_t memcpy_sz = fname == "" 
-            ? (entry.second.end - entry.second.start)
-            : fs::file_size(fname);
+          void *dst = (void *)(entry.second.start + 0x10000000000);
+          void *src = (void *)(entry.second.start);
+
+          const size_t memcpy_sz = fname == ""
+                                       ? (entry.second.end - entry.second.start)
+                                       : fs::file_size(fname);
 
           /* Copy all the allocated bytes from the actual file to the backing */
           DBGH(4) << "Calling real_memcpy(" << dst << ", " << src << ", "
-                  << memcpy_sz << ")" << std::endl;           
+                  << memcpy_sz << ")" << std::endl;
           real_memcpy(dst, src, memcpy_sz);
           break;
         }
       }
     }
-    
+
     DBGH(1) << "Calling snapshot (not msync)" << std::endl;
 
     size_t total_proc = 0;
     size_t bytes_flushed = 0;
-    size_t start = (uint64_t)addr, end = (uint64_t)addr+bytes;
+    size_t start = (uint64_t)addr, end = (uint64_t)addr + bytes;
     size_t diff = end - start;
 
 #if LOG_FORMAT_VOLATILE
@@ -303,7 +308,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
 #elif LOG_FORMAT_NON_VOLATILE
     const auto &log_list = *tls_log.log_area;
 #else
-    #error "Log format needs to be volatile or non-volatile."
+#error "Log format needs to be volatile or non-volatile."
 #endif
 
     for (const auto &entry : log_list) {
@@ -312,24 +317,26 @@ int snapshot(void *addr, size_t bytes, int flags) {
       if (entry.addr - start <= diff) [[likely]] {
         const size_t offset = entry.addr - (uint64_t)start_addr;
         const size_t dst_addr = (size_t)(pm_back + offset);
-        
+
         DBGH(4) << "Copying " << entry.bytes << " bytes from "
-                << (void*)(0UL + entry.addr) << " -> " << (void*)dst_addr
+                << (void *)(0UL + entry.addr) << " -> " << (void *)dst_addr
                 << std::endl;
 
         /* Streaming write is only allowed if the write size is a power of two
            (popcount == 1) and dest address is aligned at entry.bytes */
         bool str_wr_allowed = false;
         if (std::popcount(entry.bytes) == 1) {
-          str_wr_allowed = dst_addr % entry.bytes == 0;          
+          str_wr_allowed = dst_addr % entry.bytes == 0;
         }
 
-        if (entry.bytes >= 8 and entry.bytes < 256 and str_wr_allowed) [[likely]] {
-          pmemops->streaming_wr((void*)dst_addr, (void*)(0UL + entry.addr),
+        if (entry.bytes >= 8 and entry.bytes < 256 and str_wr_allowed)
+            [[likely]] {
+          pmemops->streaming_wr((void *)dst_addr, (void *)(0UL + entry.addr),
                                 entry.bytes);
         } else {
-          real_memcpy((void*)dst_addr, (void*)(0UL + entry.addr), entry.bytes);
-          pmemops->flush((void*)dst_addr, entry.bytes);
+          real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
+                      entry.bytes);
+          pmemops->flush((void *)dst_addr, entry.bytes);
         }
       } else if (entry.addr == 0) {
         break;
@@ -348,7 +355,8 @@ int snapshot(void *addr, size_t bytes, int flags) {
 
 #ifdef CXLBUF_TESTING_GOODIES
     if (crashOnCommit) [[unlikely]] {
-      DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)" << std::endl;
+      DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)"
+           << std::endl;
       exit(1);
     }
 #endif // CXLBUF_TESTING_GOODIES
@@ -376,7 +384,7 @@ int snapshot(void *addr, size_t bytes, int flags) {
 #ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tock();
 #endif // CXLBUF_TESTING_GOODIES
-  
+
   return 0;
 }
 

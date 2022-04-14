@@ -7,6 +7,7 @@
  */
 
 #include <cassert>
+#include <dlfcn.h>
 #include <filesystem>
 #include <thread>
 
@@ -89,12 +90,18 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     ++*logged_check_count;
 #endif
 
-    /*
-     * Align the log offset to the next cacheline.
-     * This reduces the number of clwb needed
-     */
+#ifdef TRACE_LOG_MSYNC
+    const auto ret_addr = __builtin_return_address(0);
 
-    // log_area->log_offset = ((log_area->log_offset+63)/64)*64;
+    Dl_info info;
+    dladdr(ret_addr, &info);
+    write(trace_fd, info.dli_sname, strlen(info.dli_sname));
+
+    const std::string entry_str =
+        S(ret_addr) + "," + S(start) + "," + S(bytes) + "\n";
+    write(trace_fd, ",", 1);
+    write(trace_fd, entry_str.c_str(), strlen(entry_str.c_str()));
+#endif
 
     NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
     perst_overhead_clk->tock();

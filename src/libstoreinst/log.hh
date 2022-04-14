@@ -215,3 +215,4 @@ namespace nvsl {
 }
 
 extern thread_local nvsl::cxlbuf::Log tls_log;
+extern int trace_fd;
