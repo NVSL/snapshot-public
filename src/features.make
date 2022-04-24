@@ -3,6 +3,7 @@
 CLWB_PRESENT_       := $(shell cat /proc/cpuinfo | grep -o -m1 clwb)
 CLFLUSHOPT_PRESENT_ := $(shell cat /proc/cpuinfo | grep -o -m1 clflushopt)
 SFENCE_PRESENT_     := $(shell cat /proc/cpuinfo | grep -o -m1 sse2)
+AVX512F_PRESENT_    := $(shell cat /proc/cpuinfo | grep -o -m1 avx512f)
 
 ifneq ($(PERFORM_CHECKS),0)
     # Check if /proc/cpuinfo is available to determine available
@@ -30,5 +31,12 @@ ifneq ($(PERFORM_CHECKS),0)
         export SFENCE_FLAG :=-DSFENCE_AVAIL
     else
         $(info SKIP: sfence not supported)
+    endif
+
+    ifeq ($(AVX512F_PRESENT_),avx512f)
+        $(info Checking for sfence... supported)
+        export AVX512F_FLAG :=-DAVX512F_AVAIL
+    else
+        $(info SKIP: avx512f not supported)
     endif
 endif

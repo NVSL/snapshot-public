@@ -8,7 +8,7 @@ dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
 	$(PUDDLES_MAKE) ../bin/dclang++
 
-examples: libstoreinst storeinst-pass
+examples: libstoreinst storeinst-pass libvram
 	$(PUDDLES_MAKE) -C examples
 
 libdsaemu:
