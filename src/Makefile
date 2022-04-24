@@ -1,4 +1,4 @@
-.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass
+.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass libvram
 
 include common.make
 
@@ -27,6 +27,10 @@ storeinst-pass:
 libpmbuffer:
 	$(PUDDLES_MAKE) -C libpmbuffer
 	$(PUDDLES_MAKE) ../lib/libpmbuffer.so
+
+libvram:
+	$(PUDDLES_MAKE) -C libvram
+	$(PUDDLES_MAKE) ../lib/libvram.so
 
 ../lib/%:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../lib/%, ../src/%, $@))/$(notdir $@) $@

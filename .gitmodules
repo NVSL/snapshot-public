@@ -10,3 +10,6 @@
 [submodule "vendor/config"]
 	path = vendor/config
 	url = git@github.com:boostorg/config.git
+[submodule "vendor/googletest"]
+	path = vendor/googletest
+	url = git@github.com:google/googletest.git

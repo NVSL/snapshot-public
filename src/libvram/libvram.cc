@@ -21,43 +21,8 @@ class VRamWrapper;
 
 VRamWrapper *vrw_obj;
 
-/**
- * @brief Checks the memory for errors
- * @param[in] vram_ptr Pointer to the begining of the region to check
- * @param bytes Bytes to scan
- * @warn This function will overwrite memory. Any existing data will be lost
- */
-void memcheck(void *vram_ptr, size_t bytes) {
-  const auto u64_ptr = reinterpret_cast<uint64_t *>(vram_ptr);
-  constexpr size_t GRANULARITY_BITS = 18;
-  char *bitmap = (char *)malloc(bytes >> GRANULARITY_BITS);
-  memset(bitmap, '0', bytes >> GRANULARITY_BITS);
-
-  std::cerr << "Memsetting...";
-  memset(vram_ptr, 0xFF, bytes);
-  std::cerr << "done\n";
-
-  size_t err_cnt = 0;
-  std::cerr << "Reading memory...";
-  for (size_t i = 0; i < bytes / sizeof(uint64_t); i++) {
-    if (u64_ptr[i] != -1UL) {
-      err_cnt++;
-      bitmap[(i * sizeof(uint64_t)) >> GRANULARITY_BITS] = '1';
-    }
-  }
-  std::cerr << "done. Total errors = " << err_cnt << "\n";
-  if (err_cnt > 0) {
-    std::cerr << "Error bitmap:\n";
-    for (size_t i = 0; i < bytes >> GRANULARITY_BITS; i++) {
-      std::cerr << bitmap[i];
-    }
-    std::cerr << std::endl;
-  }
-}
-
-const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
+const std::vector<const char *> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 struct QueueFamilyIndices {
   std::optional<uint32_t> graphicsFamily;
@@ -303,10 +268,10 @@ __attribute__((constructor)) void ctor_libvram() {
   vrw_obj->init();
 }
 
-void *vram_malloc(size_t bytes) {
+void *nvsl::libvram::vram_malloc(size_t bytes) {
   return vrw_obj->malloc(bytes);
 }
 
-void vram_free(void *ptr) {
+void nvsl::libvram::vram_free(void *ptr) {
   vrw_obj->free(ptr);
 }
