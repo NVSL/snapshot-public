@@ -15,7 +15,7 @@
 
 TEST(memcheck, libvram) {
   constexpr size_t BUF_SZ = 1UL * 1024 * 1024 * 1024;
-  char *buf_bptr = (char *)nvsl::libvram::malloc(BUF_SZ / 8);
+  char *buf_bptr = (char *)nvsl::libvram::malloc(BUF_SZ);
 
-  ASSERT_TRUE(nvsl::memcheck(buf_bptr, BUF_SZ) == 0);
+  ASSERT_TRUE(nvsl::memcheck(buf_bptr, BUF_SZ / 8) == 0);
 }

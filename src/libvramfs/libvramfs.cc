@@ -51,9 +51,6 @@ std::unordered_map<vramfs_path_t, vramfs_fd_t> path_to_fd;
 std::unordered_map<vramfs_fd_t, vramfs_path_t> fd_to_path;
 std::unordered_map<vramfs_fd_t, fd_desc_t> fd_desc;
 
-size_t alloc_bump_offset;
-void *vram_buf = nullptr;
-
 int get_free_fd() {
   int result = 1;
   while (fd_to_path.find(result) != fd_to_path.end()) {
@@ -76,10 +73,17 @@ int create_fd(const std::string &pathname_str) {
   fd_desc[fd] = {};
 
   fd_desc[fd].fd = fd;
-  fd_desc[fd].region = RCast<char *>(vram_buf) + alloc_bump_offset;
+  fd_desc[fd].region = 0;
   fd_desc[fd].len = 0;
-  fd_desc[fd].va_alloc_off = alloc_bump_offset;
+  fd_desc[fd].va_alloc_off = 0;
   fd_desc[fd].seek = 0;
+
+  DBGH(3) << "Created a new file descriptor with:\n"
+          << "\t.fd = " << fd_desc[fd].fd << "\n"
+          << "\t.region = " << fd_desc[fd].region << "\n"
+          << "\t.len = " << fd_desc[fd].len << "\n"
+          << "\t.va_alloc_off = " << fd_desc[fd].va_alloc_off << "\n"
+          << "\t.seek = " << fd_desc[fd].seek << "\n";
 
   return fd;
 }
@@ -96,7 +100,7 @@ off_t nvsl::libvramfs::lseek(int fd, off_t offset, int whence) {
 
   new_off = fd_desc_e.seek;
 
-  if (whence & SEEK_SET) {
+  if (whence == SEEK_SET) {
     new_off = offset;
   } else {
     errno = ENOSYS;
@@ -105,8 +109,12 @@ off_t nvsl::libvramfs::lseek(int fd, off_t offset, int whence) {
 
   fd_desc_e.seek = new_off;
 
-  if (fd_desc_e.end_off() > alloc_bump_offset) {
-    alloc_bump_offset = fd_desc_e.end_off();
+  NVSL_ASSERT(fd_desc_e.len == 0,
+              "SEEK_SET is currently only supported on a new fd");
+
+  if ((size_t)new_off > fd_desc_e.len) {
+    fd_desc_e.len = new_off;
+    fd_desc_e.region = nvsl::libvram::malloc(fd_desc_e.len);
   }
 
   return new_off;
@@ -147,15 +155,13 @@ void *nvsl::libvramfs::mmap(void *addr, size_t length, int prot, int flags,
   auto &fd_desc_e = fd_desc[fd];
 
   if (length + offset > fd_desc_e.len) {
+    DBGW << "length + offset (=" << length + offset
+         << ") is greater than file size " << fd_desc_e.len << "\n";
     errno = EINVAL;
     return MAP_FAILED;
   }
 
-  if (vram_buf == nullptr) {
-    vram_buf = nvsl::libvram::malloc(DEF_ALLOC_SIZE);
-  }
-
-  result = RCast<char *>(vram_buf) + fd_desc_e.va_alloc_off;
+  result = RCast<char *>(fd_desc_e.region) + fd_desc_e.va_alloc_off;
 
   return result;
 }

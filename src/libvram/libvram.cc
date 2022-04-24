@@ -45,8 +45,8 @@ private:
 
   VkQueue graphicsQueue;
 
-  VkBuffer vertexBuffer;
-  VkDeviceMemory vertexBufferMemory;
+  std::vector<VkBuffer> buffers;
+  std::vector<VkDeviceMemory> bufferMemories;
 
   void initVulkan() {
     createInstance();
@@ -55,11 +55,15 @@ private:
   }
 
   void cleanup() {
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-    vkFreeMemory(device, vertexBufferMemory, nullptr);
+    for (auto buf : buffers) {
+      vkDestroyBuffer(device, buf, nullptr);
+    }
+
+    for (auto mem : bufferMemories) {
+      vkFreeMemory(device, mem, nullptr);
+    }
 
     vkDestroyDevice(device, nullptr);
-
     vkDestroyInstance(instance, nullptr);
   }
 
@@ -150,19 +154,21 @@ private:
   }
 
   void *createVertexBuffer(size_t bytes) {
+    VkBuffer buffer;
+    VkDeviceMemory bufferMemory;
+
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = bytes;
     bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) !=
-        VK_SUCCESS) {
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
       throw std::runtime_error("failed to create vertex buffer!");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
     assert(memRequirements.size == bytes);
 
@@ -173,20 +179,23 @@ private:
         memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT /*| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT*/);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) !=
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) !=
         VK_SUCCESS) {
       throw std::runtime_error("failed to allocate vertex buffer memory!");
     }
 
-    vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
 
     void *data;
-    auto res = vkMapMemory(device, vertexBufferMemory, 0, bytes, 0, &data);
+    auto res = vkMapMemory(device, bufferMemory, 0, bytes, 0, &data);
     if (res != VK_SUCCESS) {
       throw std::runtime_error("Map failed");
     }
     std::cerr << "Map completed. Allocated " << (bytes) / (1024UL * 1024)
-              << " MiB" << std::endl;
+              << " MiB at " << data << std::endl;
+
+    this->buffers.push_back(buffer);
+    this->bufferMemories.push_back(bufferMemory);
 
     return data;
   }
