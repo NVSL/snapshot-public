@@ -268,10 +268,10 @@ __attribute__((constructor)) void ctor_libvram() {
   vrw_obj->init();
 }
 
-void *nvsl::libvram::vram_malloc(size_t bytes) {
+void *nvsl::libvram::malloc(size_t bytes) {
   return vrw_obj->malloc(bytes);
 }
 
-void nvsl::libvram::vram_free(void *ptr) {
+void nvsl::libvram::free(void *ptr) {
   vrw_obj->free(ptr);
 }

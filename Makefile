@@ -34,7 +34,10 @@ bin:
 lib:
 	@mkdir -p lib/
 
+.PHONY: tests
 tests:
+	$(PUDDLES_MAKE) -C tests/
+	LD_LIBRARY_PATH=lib/:$(LD_LIBRARY_PATH) tests/test.bin  --gmock_verbose=info --gtest_stack_trace_depth=10
 	src/scripts/tests/run.sh
 
 

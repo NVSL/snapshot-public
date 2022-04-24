@@ -12,7 +12,7 @@
 
 int main() {
   constexpr size_t alloc = 1UL * 128 * 1024 * 1024;
-  auto fb_ptr = nvsl::libvram::vram_malloc(alloc);
+  auto fb_ptr = nvsl::libvram::malloc(alloc);
 
   nvsl::PMemOps *pmemops = new nvsl::PMemOpsClwb;
 

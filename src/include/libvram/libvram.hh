@@ -2,7 +2,7 @@
 
 namespace nvsl {
   namespace libvram {
-    void *vram_malloc(size_t bytes);
-    void vram_free(void *ptr);
+    void *malloc(size_t bytes);
+    void free(void *ptr);
   }
 }

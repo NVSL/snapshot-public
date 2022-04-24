@@ -18,7 +18,7 @@ GTEST_DIR=../vendor/googletest/googletest
 USER_DIR=.
 
 LIBPUDDLES_CXXFLAGS:=-iquote../src/include -iquote../vendor/cpp-common/include/ -std=c++20
-LIBPUDDLES_LDFLAGS:=-L../lib/ -Wl,-R../lib/ -lvram
+LIBPUDDLES_LDFLAGS:=-L../lib/ -Wl,-R../lib/ -lvram -lvramfs
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that

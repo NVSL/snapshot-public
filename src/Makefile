@@ -1,4 +1,4 @@
-.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass libvram
+.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass libvram libvramfs
 
 include common.make
 
@@ -8,7 +8,7 @@ dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
 	$(PUDDLES_MAKE) ../bin/dclang++
 
-examples: libstoreinst storeinst-pass libvram
+examples: libstoreinst storeinst-pass libvram libvramfs
 	$(PUDDLES_MAKE) -C examples
 
 libdsaemu:
@@ -31,6 +31,10 @@ libpmbuffer:
 libvram:
 	$(PUDDLES_MAKE) -C libvram
 	$(PUDDLES_MAKE) ../lib/libvram.so
+
+libvramfs:
+	$(PUDDLES_MAKE) -C libvramfs
+	$(PUDDLES_MAKE) ../lib/libvramfs.so
 
 ../lib/%:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../lib/%, ../src/%, $@))/$(notdir $@) $@
