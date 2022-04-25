@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "bgflush.hh"
+#include "libvram/libvram.hh"
 #include "log.hh"
 #include "nvsl/clock.hh"
 #include "nvsl/pmemops.hh"
@@ -122,7 +123,7 @@ void cxlbuf::Log::flush_all() const {
 std::tuple<cxlbuf::Log::log_layout_t *, fs::path>
 cxlbuf::Log::get_log_by_id(const std::string &name,
                            void *addr /* = nullptr */) {
-  const auto log_fname = fs::path(Log::LOG_LOC) / fs::path(name + ".log");
+  const auto log_fname = fs::path(*log_loc) / fs::path(name + ".log");
 
   /* Check and open the log file */
   if (not fs::is_regular_file(log_fname)) {
@@ -156,9 +157,9 @@ cxlbuf::Log::get_log_by_id(const std::string &name,
 }
 
 void cxlbuf::Log::init_dirs() {
-  DBGH(1) << "Creating log directory " << fs::path(LOG_LOC) << std::endl;
-  if (not std::filesystem::is_directory(S(LOG_LOC))) {
-    std::filesystem::create_directory(S(LOG_LOC));
+  DBGH(1) << "Creating log directory " << fs::path(*log_loc) << std::endl;
+  if (not std::filesystem::is_directory(*log_loc)) {
+    std::filesystem::create_directory(*log_loc);
   }
 }
 
@@ -167,7 +168,7 @@ void cxlbuf::Log::init_thread_buf() {
   const auto pid = getpid();
 
   const auto fname = S(pid) + "." + S(tid) + ".log";
-  const auto fpath = S(LOG_LOC) + "/" + fname;
+  const auto fpath = *log_loc + "/" + fname;
 
   if (std::filesystem::is_regular_file(fpath)) {
     std::filesystem::remove_all(fpath);
@@ -187,9 +188,13 @@ void cxlbuf::Log::init_thread_buf() {
     exit(1);
   }
 
-  log_area =
-      (log_layout_t *)real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
-                                MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0);
+  if (is_prefix("/mnt/cxl0/", *log_loc)) {
+    log_area = RCast<log_layout_t *>(nvsl::libvram::malloc(BUF_SIZE));
+  } else {
+    log_area = RCast<log_layout_t *>(
+        real_mmap(nullptr, BUF_SIZE, PROT_READ | PROT_WRITE,
+                  MAP_SYNC | MAP_SHARED_VALIDATE, fd, 0));
+  }
 
   if (log_area == (log_layout_t *)-1) {
     perror("mmap for buffer failed");

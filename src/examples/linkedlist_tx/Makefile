@@ -8,7 +8,7 @@ INCLUDE :=-iquote../../include
 DIR      := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 LIBS_DIR := $(shell readlink -f $(DIR)../../../lib)
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
-EXTRA_LINKFLAGS +=-lrt -luuid -lpthread -rdynamic
+EXTRA_LINKFLAGS +=-lrt -luuid -lpthread -rdynamic -lvram
 EXTRA_LINKFLAGS +=-Wl,--exclude-libs,ALL
 EXTRA_LINKFLAGS +=-Wl,--no-as-needed -Wl,--whole-archive ../../../lib/libstoreinst.a -Wl,--no-whole-archive
 

@@ -6,12 +6,13 @@
  * @brief  Handles all the recovery stuff
  */
 
+#include "recovery.hh"
 #include "libc_wrappers.hh"
+#include "libvram/libvram.hh"
+#include "log.hh"
 #include "nvsl/string.hh"
 #include "nvsl/utils.hh"
-#include "recovery.hh"
 #include "utils.hh"
-#include "log.hh"
 
 #include <fcntl.h>
 #include <filesystem>
@@ -20,7 +21,6 @@
 #include <unordered_set>
 
 using namespace nvsl;
-
 
 std::vector<std::string> cxlbuf::PmemFile::needs_recovery() const {
   std::vector<std::string> result = {};
@@ -34,19 +34,18 @@ std::vector<std::string> cxlbuf::PmemFile::needs_recovery() const {
     const auto logs = split(contents.str(), "\n");
 
     DBGH(1) << "Found " << logs.size() << " logs" << std::endl;
-    
+
     for (const auto &log : logs) {
       DBGH(3) << "Checking log " << log << std::endl;
 
       const auto toks = split(log, ",", 3);
-      const auto lfname = S(Log::LOG_LOC) + "/" + toks[0] + "." + toks[1]
-        + ".log";
+      const auto lfname = *log_loc + "/" + toks[0] + "." + toks[1] + ".log";
 
       if (fs::is_regular_file(lfname)) {
         DBGH(2) << "Found log " << log << std::endl;
 
         const auto [log_ptr, _] = Log::get_log_by_id(toks[0] + "." + toks[1]);
-        
+
         if (log_ptr->state == Log::State::ACTIVE) {
           DBGH(2) << "Log needs recovery" << std::endl;
 
@@ -256,26 +255,46 @@ void cxlbuf::PmemFile::map_backing_file() {
 
   /* Since this file is opened in the PM, create a corresponding backing file
      and map it at +0x10000000000 */
-  void *bck_addr = (char*)this->addr + 0x10000000000;
+  void *bck_addr = (char *)this->addr + 0x10000000000;
   const int bck_fd = open(bfname.c_str(), O_RDWR);
 
   if (bck_fd == -1) {
     perror("Unable to open backing file");
     exit(1);
   }
-  
+
   int bck_flags = 0;
   bck_flags |= MAP_SHARED_VALIDATE;
   bck_flags |= MAP_SYNC;
-  
+
   DBGH(3) << "Calling mmap for backing: "
-          << mmap_to_str(bck_addr, this->len, PROT_READ | PROT_WRITE, bck_flags, 
+          << mmap_to_str(bck_addr, this->len, PROT_READ | PROT_WRITE, bck_flags,
                          bck_fd, 0)
           << std::endl;
-  void *mbck_addr = real_mmap(bck_addr, this->len, PROT_READ | PROT_WRITE,
-                                    MAP_SHARED_VALIDATE | MAP_SYNC, bck_fd, 0);
+  void *mbck_addr = (void *)-1;
 
-  if (mbck_addr == (void*)-1) {
+  if (is_prefix("/mnt/cxl0", this->get_backing_fname())) {
+    void *tmp_addr = real_mmap(nullptr, this->len, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE, bck_fd, 0);
+    if (tmp_addr == MAP_FAILED) {
+      DBGE << "Unable to map cxl0 file" << std::endl;
+      DBGE << PSTR() << "\n";
+      exit(1);
+    }
+    mbck_addr = nvsl::libvram::malloc(this->len);
+
+    /* Copy the content from the file to the buffer */
+    memcpy(mbck_addr, tmp_addr, this->len);
+
+    /* We no longer need the temporary mapping, the mapping on the GPU will
+     * behave as the backing region now */
+    real_munmap(tmp_addr, this->len);
+  } else {
+    mbck_addr = real_mmap(bck_addr, this->len, PROT_READ | PROT_WRITE,
+                          MAP_SHARED_VALIDATE | MAP_SYNC, bck_fd, 0);
+  }
+
+  if (mbck_addr == (void *)-1) {
     DBGE << "Unable to map backing file" << std::endl;
     DBGE << PSTR() << std::endl;
     exit(1);
@@ -285,9 +304,8 @@ void cxlbuf::PmemFile::map_backing_file() {
   }
 
   DBGH(4) << "Trying to write to the backing file...";
-  *(char*)mbck_addr = 1;
+  *(char *)mbck_addr = 1;
   DBGH(4) << "done" << std::endl;
-
 }
 
 cxlbuf::PmemFile::PmemFile(const fs::path &path, void* addr, size_t len)

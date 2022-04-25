@@ -191,8 +191,9 @@ private:
     if (res != VK_SUCCESS) {
       throw std::runtime_error("Map failed");
     }
-    std::cerr << "Map completed. Allocated " << (bytes) / (1024UL * 1024)
-              << " MiB at " << data << std::endl;
+
+    fprintf(stderr, "Map completed. Allocated %lu MiB at %p\n",
+            (bytes) / (1024UL * 1024), data);
 
     this->buffers.push_back(buffer);
     this->bufferMemories.push_back(bufferMemory);
@@ -272,7 +273,8 @@ private:
   }
 };
 
-__attribute__((constructor)) void ctor_libvram() {
+void ctor_libvram() {
+  fprintf(stderr, "%s() called\n", __FUNCTION__);
   vrw_obj = new VRamWrapper();
   vrw_obj->init();
 }

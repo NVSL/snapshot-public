@@ -111,7 +111,10 @@ void cxlbuf::init_dlsyms() {
 }
 
 extern "C" {
-void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) __THROW {
+void *memcpy(void *__restrict dst, const void *__restrict src,
+             size_t n) __THROW {
+  assert(real_memcpy != nullptr);
+
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
     tls_log.log_range(dst, n);
   }
@@ -134,40 +137,40 @@ void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
 }
 
 void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
-            __off_t __offset) __THROW {
+           __off_t __offset) __THROW {
   /* Read the file name for the fd */
   const auto fd_fname = nvsl::fd_to_fname(__fd);
 
   cxlbuf::PmemFile pmemf(fd_fname, __addr, __len);
 
   // Check if the mmaped file is in /mnt/pmem0/
-  if (is_prefix("/mnt/pmem0/", fd_fname)) {
+  if (is_prefix("/mnt/pmem0/", fd_fname) or is_prefix("/mnt/cxl0", fd_fname)) {
     if (cxlbuf::mmap_start == nullptr) {
       cxlbuf::mmap_start = start_addr;
     }
-    
+
     DBGH(1) << "Changing mmap address from " << __addr << " to "
             << cxlbuf::mmap_start << std::endl;
     __addr = cxlbuf::mmap_start;
 
     /* mmap needs aligned address */
-    cxlbuf::mmap_start = (char*)cxlbuf::mmap_start + ((__len+4095)/4096)*4096;
-
+    cxlbuf::mmap_start =
+        (char *)cxlbuf::mmap_start + ((__len + 4095) / 4096) * 4096;
 
     pmemf.set_addr(__addr);
     pmemf.create_backing_file();
     pmemf.map_backing_file();
-  }  
+  }
 
   DBGH(1) << "Call to mmap intercepted (for " << fs::path(fd_fname) << "): "
           << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
           << std::endl;
 
   void *result = pmemf.map_to_page_cache(__flags, __prot, __fd, __offset);
-  
+
   return result;
 }
-  
+
 void *mmap64(void *addr, size_t len, int prot, int flags, int fd, __off64_t off)
   __THROW {
   return mmap(addr, len, prot, flags, fd, off);
