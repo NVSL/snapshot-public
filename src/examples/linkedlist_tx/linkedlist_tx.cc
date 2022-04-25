@@ -246,20 +246,19 @@ int main(int argc, char *argv[]) {
 
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
 
-  auto res = new mmf(bip::open_or_create, args.puddle_path.c_str(),
-                     MIN_POOL_SZ*1000);
+  auto res =
+      new mmf(bip::open_or_create, args.puddle_path.c_str(), MIN_POOL_SZ * 128);
   // reservoir_t *res =
-      // new reservoir_t(libpuddles::MIN_POOL_SZ * 10, args.puddle_path.c_str());
-
+  // new reservoir_t(libpuddles::MIN_POOL_SZ * 10, args.puddle_path.c_str());
 
   auto root_ptr = res->find<linkedlist_t>("root").first;
 
   if (root_ptr == NULL) {
     std::cout << "Allocating root" << std::endl;
 
-    // TX_BEGIN(res) { 
+    // TX_BEGIN(res) {
     root_ptr = res->construct<linkedlist_t>("root")();
-    std::cerr << "Root allocated at " << (void*)root_ptr << std::endl;
+    std::cerr << "Root allocated at " << (void *)root_ptr << std::endl;
     // }
     // TX_END;
 
@@ -269,7 +268,7 @@ int main(int argc, char *argv[]) {
 
     memset(root_ptr, 0, sizeof(*root_ptr));
   } else {
-    std::cout << "Got previous root" << (void*)root_ptr << std::endl;
+    std::cout << "Got previous root" << (void *)root_ptr << std::endl;
   }
 
   // printf("Root uuid: %s\n", res->get_root_uuid().to_string().c_str());

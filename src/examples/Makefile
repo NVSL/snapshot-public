@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks redirect
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -14,7 +14,11 @@ SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx 
 
 include ../common.make
 
-all: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
+all: 
+	$(PUDDLES_MAKE) -C redirect
+	$(PUDDLES_MAKE) depends
+
+depends: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
 	map map_pmdk 
 
 map: btree_subdir

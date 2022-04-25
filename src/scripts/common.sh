@@ -34,7 +34,6 @@ check_bin() {
     BIN="$1"
     FLAG="$2"
 
-    # printf "Checking $BIN for $FLAG..."
     out=$(strings "$BIN" | grep -- "$FLAG" || true)
 
     if [ -z "$out" ]; then
@@ -52,4 +51,3 @@ set -o pipefail
 set -o errtrace
 trap 'backtrace' ERR
 
-echo 'a' | grep -q -- 'b'
