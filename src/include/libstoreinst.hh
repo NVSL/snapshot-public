@@ -20,6 +20,7 @@ namespace nvsl {
 
   namespace cxlbuf {
     extern std::string *log_loc;
+    extern void *backing_file_start;
   }
 } // namespace nvsl
 

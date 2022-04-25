@@ -258,7 +258,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   write(trace_fd, snapshot_msg.c_str(), strlen(snapshot_msg.c_str()));
 #endif
 
-  char *pm_back = (char *)0x20000000000;
+  auto pm_back = RCast<uint8_t *>(cxlbuf::backing_file_start);
 
   tls_log.flush_all();
 
@@ -282,9 +282,10 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
                   << " (=" << fs::path(fname) << ") ["
                   << (void *)entry.second.start << ", "
                   << (void *)entry.second.end << "]" << std::endl;
+          const size_t off = entry.second.start - 0x10000000000;
+          void *dst = RCast<uint8_t *>(nvsl::cxlbuf::backing_file_start) + off;
 
-          void *dst = (void *)(entry.second.start + 0x10000000000);
-          void *src = (void *)(entry.second.start);
+          const void *src = (void *)(entry.second.start);
 
           const size_t memcpy_sz = fname == ""
                                        ? (entry.second.end - entry.second.start)

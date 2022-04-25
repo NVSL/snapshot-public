@@ -37,6 +37,7 @@ int trace_fd = -1;
 namespace nvsl {
   namespace cxlbuf {
     std::string *log_loc;
+    void *backing_file_start;
   }
 } // namespace nvsl
 

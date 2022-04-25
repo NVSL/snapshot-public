@@ -8,6 +8,7 @@
 
 #include "recovery.hh"
 #include "libc_wrappers.hh"
+#include "libstoreinst.hh"
 #include "libvram/libvram.hh"
 #include "log.hh"
 #include "nvsl/string.hh"
@@ -271,7 +272,7 @@ void cxlbuf::PmemFile::map_backing_file() {
           << mmap_to_str(bck_addr, this->len, PROT_READ | PROT_WRITE, bck_flags,
                          bck_fd, 0)
           << std::endl;
-  void *mbck_addr = (void *)-1;
+  void *mbck_addr = MAP_FAILED;
 
   if (is_prefix("/mnt/cxl0", this->get_backing_fname())) {
     void *tmp_addr = real_mmap(nullptr, this->len, PROT_READ | PROT_WRITE,
@@ -283,6 +284,12 @@ void cxlbuf::PmemFile::map_backing_file() {
     }
     mbck_addr = nvsl::libvram::malloc(this->len);
 
+    /* Set the backing_file_start to let the logging mechanism copy content into
+       the backing file on snapshot() */
+    NVSL_ASSERT(nvsl::cxlbuf::backing_file_start == nullptr,
+                "Mapping multiple backing files not supported");
+    nvsl::cxlbuf::backing_file_start = mbck_addr;
+
     /* Copy the content from the file to the buffer */
     memcpy(mbck_addr, tmp_addr, this->len);
 
@@ -290,11 +297,12 @@ void cxlbuf::PmemFile::map_backing_file() {
      * behave as the backing region now */
     real_munmap(tmp_addr, this->len);
   } else {
+    nvsl::cxlbuf::backing_file_start = RCast<void *>(0x20000000000);
     mbck_addr = real_mmap(bck_addr, this->len, PROT_READ | PROT_WRITE,
                           MAP_SHARED_VALIDATE | MAP_SYNC, bck_fd, 0);
   }
 
-  if (mbck_addr == (void *)-1) {
+  if (mbck_addr == MAP_FAILED) {
     DBGE << "Unable to map backing file" << std::endl;
     DBGE << PSTR() << std::endl;
     exit(1);
