@@ -134,40 +134,42 @@ void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
 }
 
 void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
-            __off_t __offset) __THROW {
+           __off_t __offset) __THROW {
   /* Read the file name for the fd */
   const auto fd_fname = nvsl::fd_to_fname(__fd);
 
   cxlbuf::PmemFile pmemf(fd_fname, __addr, __len);
+
+  std::cerr << "<< catch mmap >>" << std::endl;
 
   // Check if the mmaped file is in /mnt/pmem0/
   if (is_prefix("/mnt/pmem0/", fd_fname)) {
     if (cxlbuf::mmap_start == nullptr) {
       cxlbuf::mmap_start = start_addr;
     }
-    
+
     DBGH(1) << "Changing mmap address from " << __addr << " to "
             << cxlbuf::mmap_start << std::endl;
     __addr = cxlbuf::mmap_start;
 
     /* mmap needs aligned address */
-    cxlbuf::mmap_start = (char*)cxlbuf::mmap_start + ((__len+4095)/4096)*4096;
-
+    cxlbuf::mmap_start =
+        (char *)cxlbuf::mmap_start + ((__len + 4095) / 4096) * 4096;
 
     pmemf.set_addr(__addr);
     pmemf.create_backing_file();
     pmemf.map_backing_file();
-  }  
+  }
 
   DBGH(1) << "Call to mmap intercepted (for " << fs::path(fd_fname) << "): "
           << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
           << std::endl;
 
   void *result = pmemf.map_to_page_cache(__flags, __prot, __fd, __offset);
-  
+
   return result;
 }
-  
+
 void *mmap64(void *addr, size_t len, int prot, int flags, int fd, __off64_t off)
   __THROW {
   return mmap(addr, len, prot, flags, fd, off);
@@ -214,29 +216,27 @@ void *mremap (void *__addr, size_t __old_len, size_t __new_len,
   return real_mremap(__addr, __old_len, __new_len, __flags);
 }
 
-  
-
-int fdatasync (int __fildes) {
+int fdatasync(int __fildes) {
   int result = 0;
-  const bool addr_mapped
-    = cxlbuf::mapped_addr.find(__fildes) != cxlbuf::mapped_addr.end();
+  const bool addr_mapped =
+      cxlbuf::mapped_addr.find(__fildes) != cxlbuf::mapped_addr.end();
   cxlbuf::addr_range_t range = {};
   if (addr_mapped) {
     range = cxlbuf::mapped_addr[__fildes];
   }
 
-  DBGH(3) << "Call to fdatasync intercepted: fdatasync(" << __fildes << "=["
-          << (void*)range.start << ":" << (void*)range.end << "])\n";
-  if (addr_mapped and addr_in_range((void*)(range.start+1))){
-    DBGH(2) << "Calling snapshot with (" << (void*)range.start << ", "
+  DBGH(1) << "Call to fdatasync intercepted: fdatasync(" << __fildes << "=["
+          << (void *)range.start << ":" << (void *)range.end << "])\n";
+  if (addr_mapped and addr_in_range((void *)(range.start + 1))) {
+    DBGH(2) << "Calling snapshot with (" << (void *)range.start << ", "
             << range.end - range.start << ", " << MAP_SYNC << ")\n";
-    
-    result = snapshot((void*)range.start, range.end - range.start, MS_SYNC);
+
+    result = snapshot((void *)range.start, range.end - range.start, MS_SYNC);
     DBGH(3) << "Snapshot returned " << result << "\n";
   } else {
     result = real_fdatasync(__fildes);
   }
-  
+
   return result;
 }
 

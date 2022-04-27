@@ -325,7 +325,8 @@ void cxlbuf::PmemFile::write_dependency() {
   close(fd);
 }
 
-void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd, off_t off) {
+void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
+                                          off_t off) {
   /* Add map fixed no replace to prevent kernel from mapping it outside the
      tracking space and remove the MAP_SYNC flag */
   if (this->addr != nullptr) {
@@ -339,13 +340,13 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd, off_t off
   void *result = real_mmap(this->addr, this->len, prot, flags, fd, off);
 
   if (result != nullptr) {
-    const cxlbuf::addr_range_t val
-      = {(size_t)(this->addr), (size_t)((char*)this->addr + this->len)};
+    const cxlbuf::addr_range_t val = {(size_t)(this->addr),
+                                      (size_t)((char *)this->addr + this->len)};
     cxlbuf::mapped_addr.insert_or_assign(fd, val);
-    DBGH(2) << "mmap_addr recorded " << fd << " -> " << (void*)val.start << ", "
-            << (void*)val.end << std::endl;
+    DBGH(2) << "mmap_addr recorded " << fd << " -> " << (void *)val.start
+            << ", " << (void *)val.end << std::endl;
 
-    if (not addr_in_range(result)) {
+    if (not addr_in_range(result) and this->addr != nullptr) {
       DBGE << "Cannot map pmem file in range" << std::endl;
       DBGE << "Asked " << this->addr << ", got " << result << std::endl;
       perror("mmap:");
