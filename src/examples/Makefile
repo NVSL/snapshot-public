@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks redirect
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -9,12 +9,17 @@ EXTRA_CXXFLAGS += -fno-omit-frame-pointer
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
-SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx microbenchmarks
+SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx \
+	microbenchmarks gpu-microbenchmarks
 
 include ../common.make
 
-all: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
-	map map_pmdk
+all: 
+	$(PUDDLES_MAKE) -C redirect
+	$(PUDDLES_MAKE) depends
+
+depends: single_write dummy cat-demo periodic-msync $(addsuffix _subdir,$(SUBDIRS)) \
+	map map_pmdk 
 
 map: btree_subdir
 	$(PUDDLES_MAKE) -C map

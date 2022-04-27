@@ -6,7 +6,7 @@ VISBILITY_HIDDEN := -fvisibility=hidden
 endif
 
 %.o: %.cc $(DEPS_DIR)/%.d | $(DEPS_DIR)
-	$(PUDDLES_CXX) $(INCLUDE) -mclwb -mavx -mavx2 -mavx512f -c $(CXXFLAGS)\
+	$(PUDDLES_CXX) $(INCLUDE) -mclwb -mavx -mavx2 $(AVX512F_PRESENT) -c $(CXXFLAGS)\
 		$(PUDDLES_CXXFLAGS) $< -MT $@ -o $@ -MMD -MP -MF $(DEPS_DIR)/$*.d
 
 $(DEPS_DIR): ; @mkdir -p $@

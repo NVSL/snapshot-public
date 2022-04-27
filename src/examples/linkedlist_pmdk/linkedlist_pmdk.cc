@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
   } else {
     std::cout << "Created a new pool" << std::endl;
     pool = pmemobj_create(args.pool_path.c_str(), "linkedlist",
-                          PMEMOBJ_MIN_POOL * 10000, 0600);
+                          PMEMOBJ_MIN_POOL * 500, 0600);
   }
 
   TOID(struct linkedlist_pmdk_t)

@@ -5,6 +5,7 @@
 - Boost.Config (included)
 - Boost.Move (included)
 - nvsl.cpp-common (included)
+- libvulkan-dev
 
 ** Build
 To build the project:

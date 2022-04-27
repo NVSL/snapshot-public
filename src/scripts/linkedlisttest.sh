@@ -2,11 +2,26 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${DIR}/common.sh
+ROOT="${DIR}/../../"
 
-LL_ROOT="/home/smahar/git/cxlbuf/src/examples/"
+LL_ROOT="${ROOT}/src/examples/"
 LL_CXLBUF="linkedlist_tx/linkedlist_tx"
 LL_PMDK="linkedlist_pmdk/linkedlist_pmdk"
-PMDK_POOL="/mnt/pmem0/linkedlist"
+
+if [ -z "${1-}" ]; then
+    printf "USAGE:\n\t${BASH_SOURCE[0]} (GPU|PMEM)\n" >&2
+    exit 1
+fi
+
+if [ "$1" = "GPU" ]; then
+    PMDK_POOL="/mnt/cxl0/linkedlist"
+    LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
+    CXLBUF_LOG_LOC="/mnt/cxl0/cxlbuf_logs"
+else
+    PMDK_POOL="/mnt/pmem0/linkedlist"
+    LD_PRELOAD=""
+    CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs"
+fi
 
 OPS=$HUNDRED_K
 
@@ -29,24 +44,26 @@ execute() {
     printf "${NAME},"
 
     rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
+    rm -rf "${CXLBUF_LOG_LOC}"
 
-    pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
+    #pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
     
-    pmdk=$(printf "$OP" | "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
+    pmdk=$(printf "$OP" | LD_PRELOAD="${LD_PRELOAD}" "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${pmdk},"
 
     rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
-    cxlbuf=$(printf "$OP" | CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
+    rm -rf "${CXLBUF_LOG_LOC}"
+    cxlbuf=$(printf "$OP" | CXLBUF_LOG_LOC="${CXLBUF_LOG_LOC}" CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
-    printf "${cxlbuf},"
+    printf "${cxlbuf},\n"
+
+    return
 
     rm -f "${PMDK_POOL}*"
-    rm -rf "${LOG_LOC}"
+    rm -rf "${CXLBUF_LOG_LOC}"
     printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 

@@ -9,6 +9,7 @@
 #include "common.hh"
 #include "libc_wrappers.hh"
 #include "libstoreinst.hh"
+#include "libvram/libvram.hh"
 #include "log.hh"
 #include "nvsl/clock.hh"
 #include "nvsl/common.hh"
@@ -23,6 +24,7 @@ NVSL_DECL_ENV(PMEM_END_ADDR);
 NVSL_DECL_ENV(PMEM_START_ADDR);
 NVSL_DECL_ENV(CXLBUF_MSYNC_IS_NOP);
 NVSL_DECL_ENV(CXLBUF_MSYNC_SLEEP_NS);
+NVSL_DECL_ENV(CXLBUF_LOG_LOC);
 
 #define TRACE_FILE "/tmp/cxlbuf.trace"
 
@@ -31,6 +33,13 @@ bool crashOnCommit = false;
 bool nopMsync = false;
 size_t msyncSleepNs = 0;
 int trace_fd = -1;
+
+namespace nvsl {
+  namespace cxlbuf {
+    std::string *log_loc;
+    void *backing_file_start;
+  }
+} // namespace nvsl
 
 extern "C" {
 void *start_addr, *end_addr = nullptr;
@@ -84,6 +93,8 @@ void init_pmemops() {
 void init_envvars() {
   crashOnCommit = get_env_val(CXLBUF_CRASH_ON_COMMIT_ENV);
   nopMsync = get_env_val(CXLBUF_MSYNC_IS_NOP_ENV);
+  nvsl::cxlbuf::log_loc = new std::string(
+      get_env_str(CXLBUF_LOG_LOC_ENV, "/mnt/pmem0/cxlbuf_logs/"));
 
   const auto msyncSleepNsStr = get_env_str(CXLBUF_MSYNC_SLEEP_NS_ENV);
   try {
@@ -96,12 +107,21 @@ void init_envvars() {
   std::cerr << "msyncSleepNS = " << msyncSleepNs << std::endl;
 }
 
-__attribute__((__constructor__)) void libstoreinst_ctor() {
+void init_vram() {
+  ctor_libvram();
+}
+
+/**
+ * @brief Constructor for the libstoreinst shared object
+ * @detail Should run first since it defines memcpy and other important stuff
+ */
+__attribute__((__constructor__(101))) void libstoreinst_ctor() {
   nvsl::cxlbuf::init_dlsyms();
   init_counters();
   init_addrs();
   init_pmemops();
   init_envvars();
+  init_vram();
 
 #ifdef TRACE_LOG_MSYNC
   trace_fd = open(TRACE_FILE, O_CREAT | O_TRUNC | O_RDWR, 0666);

@@ -111,7 +111,10 @@ void cxlbuf::init_dlsyms() {
 }
 
 extern "C" {
-void *memcpy(void *__restrict dst, const void *__restrict src, size_t n) __THROW {
+void *memcpy(void *__restrict dst, const void *__restrict src,
+             size_t n) __THROW {
+  assert(real_memcpy != nullptr);
+
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
     tls_log.log_range(dst, n);
   }
@@ -143,7 +146,7 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   std::cerr << "<< catch mmap >>" << std::endl;
 
   // Check if the mmaped file is in /mnt/pmem0/
-  if (is_prefix("/mnt/pmem0/", fd_fname)) {
+  if (is_prefix("/mnt/pmem0/", fd_fname) or is_prefix("/mnt/cxl0", fd_fname)) {
     if (cxlbuf::mmap_start == nullptr) {
       cxlbuf::mmap_start = start_addr;
     }
@@ -255,7 +258,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   write(trace_fd, snapshot_msg.c_str(), strlen(snapshot_msg.c_str()));
 #endif
 
-  char *pm_back = (char *)0x20000000000;
+  auto pm_back = RCast<uint8_t *>(cxlbuf::backing_file_start);
 
   tls_log.flush_all();
 
@@ -279,9 +282,10 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
                   << " (=" << fs::path(fname) << ") ["
                   << (void *)entry.second.start << ", "
                   << (void *)entry.second.end << "]" << std::endl;
+          const size_t off = entry.second.start - 0x10000000000;
+          void *dst = RCast<uint8_t *>(nvsl::cxlbuf::backing_file_start) + off;
 
-          void *dst = (void *)(entry.second.start + 0x10000000000);
-          void *src = (void *)(entry.second.start);
+          const void *src = (void *)(entry.second.start);
 
           const size_t memcpy_sz = fname == ""
                                        ? (entry.second.end - entry.second.start)
