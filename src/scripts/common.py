@@ -161,7 +161,7 @@ class Fig(object):
 
         return self
 
-    def fmt_legend(self, loc='upper center'):
+    def fmt_legend(self, loc='upper center', mask=None):
         if loc != 'upper center':
             raise Exception("Unimplemented")
 
@@ -170,7 +170,25 @@ class Fig(object):
         if loc == 'upper center':
             bbox_to_anchor = (0.5, 1.55)
 
+        handles, labels = self.ax.get_legend_handles_labels()
+        
+        # Get the handles to format them in case asked to apply a mask
+        if mask != None:
+            if len(mask) != len(handles):
+                raise Exception("Mask length should be same as the number of handles")
+            
+            new_handles = []
+            new_labels = []
+            for iter in range(len(handles)):
+                if mask[iter]:
+                    new_handles.append(handles[iter])
+                    new_labels.append(labels[iter])
+            
+            handles = new_handles
+            labels = new_labels
+            
         _ = self.ax.legend(
+            handles=handles,
             fontsize=Fig.fontsize_gbl, 
             fancybox=False, 
             framealpha=1, 

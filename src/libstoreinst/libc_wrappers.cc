@@ -122,16 +122,19 @@ void *memcpy(void *__restrict dst, const void *__restrict src,
   return real_memcpy(dst, src, n);
 }
 
-void *memmove(void *__restrict dst, const void *__restrict src, size_t n)
-  __THROW {
+void *memmove(void *__restrict dst, const void *__restrict src,
+              size_t n) __THROW {
   bool memmove_logged = false;
+
+  assert(real_memmove != nullptr);
+
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
     tls_log.log_range(dst, n);
     memmove_logged = true;
   }
-  
-  DBGH(4) << "memmove(" << dst << ", " << src << ", " << n << "), logged = "
-          << memmove_logged << std::endl;
+
+  DBGH(4) << "memmove(" << dst << ", " << src << ", " << n
+          << "), logged = " << memmove_logged << std::endl;
 
   return real_memmove(dst, src, n);
 }
@@ -143,7 +146,9 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
 
   cxlbuf::PmemFile pmemf(fd_fname, __addr, __len);
 
-  std::cerr << "<< catch mmap >>" << std::endl;
+  DBGH(1) << "Call to mmap intercepted (for " << fs::path(fd_fname) << "): "
+          << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
+          << std::endl;
 
   // Check if the mmaped file is in /mnt/pmem0/
   if (is_prefix("/mnt/pmem0/", fd_fname) or is_prefix("/mnt/cxl0", fd_fname)) {
@@ -163,10 +168,6 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
     pmemf.create_backing_file();
     pmemf.map_backing_file();
   }
-
-  DBGH(1) << "Call to mmap intercepted (for " << fs::path(fd_fname) << "): "
-          << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
-          << std::endl;
 
   void *result = pmemf.map_to_page_cache(__flags, __prot, __fd, __offset);
 

@@ -1,4 +1,4 @@
-.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass libvram libvramfs
+.PHONY: libdsaemu libpmbuffer libstoreinst examples storeinst-pass libvram libvramfs libpmdkemul
 
 include common.make
 
@@ -8,12 +8,16 @@ dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
 	$(PUDDLES_MAKE) ../bin/dclang++
 
-examples: libstoreinst storeinst-pass
+examples: libstoreinst libpmdkemul
 	$(PUDDLES_MAKE) -C examples
 
 libdsaemu:
 	$(PUDDLES_MAKE) -C libdsaemu
 	$(PUDDLES_MAKE) ../lib/libdsaemu.so
+
+libpmdkemul: storeinst-pass
+	$(PUDDLES_MAKE) -C libpmdkemul
+	$(PUDDLES_MAKE) ../lib/libpmdkemul.so
 
 libstoreinst: libvram libvramfs
 	$(PUDDLES_MAKE) -C libstoreinst
@@ -43,7 +47,7 @@ libvramfs:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../bin/%, ../src/storeinst-pass/%, $@)) $@
 
 clean: libpmbuffer_clean libdsaemu_clean examples_clean storeinst-pass_clean \
-	scripts_clean libstoreinst_clean
+	scripts_clean libstoreinst_clean libpmdkemul_clean
 
 %_clean:
 	$(PUDDLES_MAKE) -C $(subst _clean,,$@) clean

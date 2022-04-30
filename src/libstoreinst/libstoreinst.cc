@@ -121,7 +121,10 @@ __attribute__((__constructor__(101))) void libstoreinst_ctor() {
   init_addrs();
   init_pmemops();
   init_envvars();
+
+#ifdef ENABLE_LIBVRAM
   init_vram();
+#endif
 
 #ifdef TRACE_LOG_MSYNC
   trace_fd = open(TRACE_FILE, O_CREAT | O_TRUNC | O_RDWR, 0666);

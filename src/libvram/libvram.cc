@@ -83,8 +83,8 @@ class VRamWrapper;
 
 VRamWrapper *vrw_obj;
 
-const std::vector<const char *> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+const size_t DEV_EXT_LEN = 1;
+const char *deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 struct QueueFamilyIndices {
   std::optional<uint32_t> graphicsFamily;
@@ -201,9 +201,8 @@ private:
 
     createInfo.pEnabledFeatures = &deviceFeatures;
 
-    createInfo.enabledExtensionCount =
-        static_cast<uint32_t>(deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(DEV_EXT_LEN);
+    createInfo.ppEnabledExtensionNames = deviceExtensions;
 
     createInfo.enabledLayerCount = 0;
 
@@ -302,8 +301,8 @@ private:
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
                                          availableExtensions.data());
 
-    std::set<std::string> requiredExtensions(deviceExtensions.begin(),
-                                             deviceExtensions.end());
+    std::set<std::string> requiredExtensions(deviceExtensions,
+                                             deviceExtensions + DEV_EXT_LEN);
 
     for (const auto &extension : availableExtensions) {
       requiredExtensions.erase(extension.extensionName);

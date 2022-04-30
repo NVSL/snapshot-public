@@ -34,7 +34,7 @@ ifneq ($(PERFORM_CHECKS),0)
     endif
 
     ifeq ($(AVX512F_PRESENT_),avx512f)
-        $(info Checking for sfence... supported)
+        $(info Checking for avx512f... supported)
         export AVX512F_FLAG :=-DAVX512F_AVAIL
     else
         $(info SKIP: avx512f not supported)

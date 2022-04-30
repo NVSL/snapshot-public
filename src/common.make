@@ -15,6 +15,10 @@ CXXFLAGS    :=-std=gnu++20 -ggdb3 -O0 -fPIC -Wall
 CXXFLAGS    += -fno-omit-frame-pointer -Werror
 endif
 
+ifdef AVX512F_FLAG
+CXXFLAGS    +=-mavx512f
+endif
+
 ifdef DEBUG_BUILD
 CXXFLAGS    += -v
 endif

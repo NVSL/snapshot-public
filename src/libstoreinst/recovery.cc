@@ -34,7 +34,7 @@ std::vector<std::string> cxlbuf::PmemFile::needs_recovery() const {
 
     const auto logs = split(contents.str(), "\n");
 
-    DBGH(1) << "Found " << logs.size() << " logs" << std::endl;
+    DBGH(1) << "Found " << logs.size() << " logs in " << dfname << std::endl;
 
     for (const auto &log : logs) {
       DBGH(3) << "Checking log " << log << std::endl;
@@ -174,7 +174,7 @@ std::string cxlbuf::PmemFile::get_backing_fname() const {
 }
 
 std::string cxlbuf::PmemFile::get_dependency_fname() const {
-    return this->path.string() + "-dependencies.txt";
+  return this->path.string() + "-dependencies.txt";
 }
 
 bool cxlbuf::PmemFile::has_backing_file() {
@@ -296,7 +296,7 @@ void cxlbuf::PmemFile::map_backing_file() {
     /* We no longer need the temporary mapping, the mapping on the GPU will
      * behave as the backing region now */
     real_munmap(tmp_addr, this->len);
-  } else {
+  } else if (is_prefix("/mnt/pmem0/", this->get_backing_fname())) {
     nvsl::cxlbuf::backing_file_start = RCast<void *>(0x20000000000);
     mbck_addr = real_mmap(bck_addr, this->len, PROT_READ | PROT_WRITE,
                           MAP_SHARED_VALIDATE | MAP_SYNC, bck_fd, 0);
@@ -316,12 +316,14 @@ void cxlbuf::PmemFile::map_backing_file() {
   DBGH(4) << "done" << std::endl;
 }
 
-cxlbuf::PmemFile::PmemFile(const fs::path &path, void* addr, size_t len)
-  : path(path), addr(addr), len(len) {
-
-  if (const auto recovery_files = this->needs_recovery();
-      not recovery_files.empty()) {
-    recover(recovery_files);
+cxlbuf::PmemFile::PmemFile(const fs::path &path, void *addr, size_t len)
+    : path(path), addr(addr), len(len) {
+  /* Only check for recovery if this is a non-anonymous mapping */
+  if (not path.empty()) {
+    if (const auto recovery_files = this->needs_recovery();
+        not recovery_files.empty()) {
+      recover(recovery_files);
+    }
   }
 }
 
