@@ -54,6 +54,14 @@
 #include <sys/utsname.h>
 #include <locale.h>
 #include <sys/socket.h>
+#ifdef USE_PMDK
+
+uint64_t pm_type_root_type_id;
+uint64_t pm_type_key_val_pair_PM;
+uint64_t pm_type_sds_type_id;
+uint64_t pm_type_emb_sds_type_id;
+
+#endif
 
 /* Our shared "common" objects */
 
@@ -64,14 +72,6 @@ struct sharedObjectsStruct shared;
  * at runtime to avoid strange compiler optimizations. */
 
 double R_Zero, R_PosInf, R_NegInf, R_Nan;
-
-#ifdef USE_PMDK
-uint64_t pm_type_root_type_id;
-uint64_t pm_type_key_val_pair_PM;
-uint64_t pm_type_sds_type_id;
-uint64_t pm_type_emb_sds_type_id;
-extern int startTracking;
-#endif
 
 /*================================= Globals ================================= */
 
@@ -2058,8 +2058,6 @@ void initServer(void) {
         server.maxmemory = 3072LL*(1024*1024); /* 3 GB */
         server.maxmemory_policy = MAXMEMORY_NO_EVICTION;
     }
-
-    startTracking = true;
 
     if (server.cluster_enabled) clusterInit();
     replicationScriptCacheInit();

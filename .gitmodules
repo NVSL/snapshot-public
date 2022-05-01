@@ -13,3 +13,6 @@
 [submodule "vendor/googletest"]
 	path = vendor/googletest
 	url = git@github.com:google/googletest.git
+[submodule "vendor/redis/deps/pmdk"]
+	path = vendor/redis/deps/pmdk
+	url = git@github.com:pmem/pmdk.git

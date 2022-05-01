@@ -53,9 +53,9 @@ endif
 # Override default settings if possible
 -include .make-settings
 
-FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS) -I../deps/geohash-int -I../../../src/include
-FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)  -lpmdkemul -lstoreinst -L../../../lib/
-FINAL_LIBS=-lm -lstoreinst -lpmdkemul -L../../../lib/
+FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS) -I../deps/geohash-int
+FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
+FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
 ifeq ($(uname_S),SunOS)
@@ -110,13 +110,12 @@ endif
 
 ifeq ($(USE_PMDK),yes)
 	DEPENDENCY_TARGETS+= pmdk
-	FINAL_CFLAGS+= -DUSE_PMDK -I../../../src/include/libpmdkemul -Wno-unused-parameter
-#	FINAL_CFLAGS+= -I../deps/pmdk/src/include -I../deps/pmdk/src/libpmemobj -I../deps/pmdk/src/common -DUSE_PMDK
-#ifeq ($(NVML_DEBUG),yes)
-#	FINAL_LIBS+= ../deps/pmdk/src/debug/libpmemobj.so ../deps/pmdk/src/debug/libpmem.so
-#else
-#	FINAL_LIBS+= ../deps/pmdk/src/nondebug/libpmemobj.so ../deps/pmdk/src/nondebug/libpmem.so
-#endif
+	FINAL_CFLAGS+= -I../deps/pmdk/src/include -I../deps/pmdk/src/libpmemobj -I../deps/pmdk/src/common -I../deps/pmdk/src/core/ -DUSE_PMDK
+ifeq ($(NVML_DEBUG),yes)
+	FINAL_LIBS+= ../deps/pmdk/src/debug/libpmemobj.so ../deps/pmdk/src/debug/libpmem.so
+else
+	FINAL_LIBS+= ../deps/pmdk/src/nondebug/libpmemobj.so ../deps/pmdk/src/nondebug/libpmem.so
+endif
 	FINAL_LIBS+= -ldl
 endif
 

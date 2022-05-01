@@ -35,7 +35,7 @@
 
 #ifdef USE_PMDK
 #include "obj.h"
-#include "libpmdkemul/libpmemobj.h"
+#include "libpmemobj.h"
 #endif
 
 
