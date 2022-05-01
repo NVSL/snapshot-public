@@ -368,11 +368,14 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
   void *result = real_mmap(this->addr, this->len, prot, flags, fd, off);
 
   if (result != nullptr) {
-    const cxlbuf::addr_range_t val = {(size_t)(this->addr),
-                                      (size_t)((char *)this->addr + this->len)};
-    cxlbuf::mapped_addr.insert_or_assign(fd, val);
-    DBGH(2) << "mmap_addr recorded " << fd << " -> " << (void *)val.start
-            << ", " << (void *)val.end << std::endl;
+    const cxlbuf::addr_range_t range = {
+        (size_t)(this->addr), (size_t)((char *)this->addr + this->len)};
+    const cxlbuf::fd_metadata_t fd_metadata = {
+        .fd = fd, .range = range, .fpath = this->path};
+
+    cxlbuf::mapped_addr.insert_or_assign(fd, fd_metadata);
+    DBGH(2) << "mmap_addr recorded " << fd << " -> " << (void *)range.start
+            << ", " << (void *)range.end << std::endl;
 
     if (not addr_in_range(result) and this->addr != nullptr) {
       DBGE << "Cannot map pmem file in range" << std::endl;

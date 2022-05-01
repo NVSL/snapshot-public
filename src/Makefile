@@ -2,7 +2,7 @@
 
 include common.make
 
-all: libdsaemu libpmbuffer examples dclang_links
+all: libdsaemu libpmbuffer examples
 
 dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
@@ -15,7 +15,7 @@ libdsaemu:
 	$(PUDDLES_MAKE) -C libdsaemu
 	$(PUDDLES_MAKE) ../lib/libdsaemu.so
 
-libpmdkemul: storeinst-pass
+libpmdkemul: storeinst-pass dclang_links
 	$(PUDDLES_MAKE) -C libpmdkemul
 	$(PUDDLES_MAKE) ../lib/libpmdkemul.so
 

@@ -34,8 +34,8 @@ typedef int (*msync_sign)(void *addr, size_t length, int flags);
 
 void *(*real_memcpy)(void *, const void *, size_t) = nullptr;
 void *(*real_memmove)(void *, const void *, size_t) = nullptr;
-void *(*real_mmap)(void *__addr, size_t __len, int __prot, int __flags, int __fd,
-                   __off_t __offset) = nullptr;
+void *(*real_mmap)(void *__addr, size_t __len, int __prot, int __flags,
+                   int __fd, __off_t __offset) = nullptr;
 void *(*real_mremap)(void *__addr, size_t __old_len, size_t __new_len,
                      int __flags, ...) = nullptr;
 int (*real_munmap)(void *__addr, size_t __len) = nullptr;
@@ -46,7 +46,7 @@ int (*real_msync)(void *addr, size_t length, int flags);
 /*-- LIBC functions END --*/
 
 /** @brief Map from file descriptor to mapped address range **/
-std::unordered_map<int, cxlbuf::addr_range_t> cxlbuf::mapped_addr;
+std::unordered_map<int, cxlbuf::fd_metadata_t> cxlbuf::mapped_addr;
 
 /** @brief Bump allocator for the START_ADDR -> END_ADDR mmap tracking space **/
 void *cxlbuf::mmap_start = nullptr;
@@ -87,7 +87,8 @@ void cxlbuf::init_dlsyms() {
 
   real_fdatasync = (fsync_sign)dlsym(RTLD_NEXT, "fdatasync");
   if (real_fdatasync == nullptr) {
-    DBGE << "dlsym failed for fdatasync: %s\n" << std::string(dlerror()) << "\n";
+    DBGE << "dlsym failed for fdatasync: %s\n"
+         << std::string(dlerror()) << "\n";
     exit(1);
   }
 
@@ -191,7 +192,6 @@ int msync(void *__addr, size_t __len, int __flags) {
   return snapshot(__addr, __len, __flags);
 }
 
-
 int fsync(int __fd) __THROW {
   DBGH(1) << "Call to fsync intercepted: fsync(" << __fd << ")";
 
@@ -203,11 +203,11 @@ int fsync(int __fd) __THROW {
     exit(1);
   }
 
-  const auto address_range = mapped_addr[__fd];
-  
+  const auto fd_metadata = mapped_addr[__fd];
+
   if (storeInstEnabled) {
-    return snapshot((void*)address_range.start, 
-                    address_range.end - address_range.start, MS_SYNC);
+    return snapshot((void *)fd_metadata.range.start,
+                    fd_metadata.range.end - fd_metadata.range.start, MS_SYNC);
   } else {
     return real_fsync(__fd);
   }
@@ -226,7 +226,7 @@ int fdatasync(int __fildes) {
       cxlbuf::mapped_addr.find(__fildes) != cxlbuf::mapped_addr.end();
   cxlbuf::addr_range_t range = {};
   if (addr_mapped) {
-    range = cxlbuf::mapped_addr[__fildes];
+    range = cxlbuf::mapped_addr[__fildes].range;
   }
 
   DBGH(1) << "Call to fdatasync intercepted: fdatasync(" << __fildes << "=["
@@ -274,23 +274,25 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
       DBGH(1) << "== First snapshot ==" << std::endl;
       firstSnapshot = false;
 
+      /* If this is the first snapshot, copy all the mapped regions from their
+         source to the backing files. This allows us to get the two copies on
+         parity. */
       for (const auto &entry : cxlbuf::mapped_addr) {
-        const auto fname = fd_to_fname(entry.first);
+        const auto fname = entry.second.fpath;
+        const auto erange = entry.second.range;
 
-        if (entry.second.start <= (size_t)addr and
-            entry.second.end > (size_t)addr) {
+        if (erange.start <= (size_t)addr and erange.end > (size_t)addr) {
           DBGH(2) << "Found the entry " << entry.first
-                  << " (=" << fs::path(fname) << ") ["
-                  << (void *)entry.second.start << ", "
-                  << (void *)entry.second.end << "]" << std::endl;
-          const size_t off = entry.second.start - 0x10000000000;
+                  << " (=" << fs::path(fname) << ") [" << (void *)erange.start
+                  << ", " << (void *)erange.end << "]" << std::endl;
+
+          const size_t off = erange.start - 0x10000000000;
           void *dst = RCast<uint8_t *>(nvsl::cxlbuf::backing_file_start) + off;
 
-          const void *src = (void *)(entry.second.start);
+          const void *src = (void *)(erange.start);
 
-          const size_t memcpy_sz = fname == ""
-                                       ? (entry.second.end - entry.second.start)
-                                       : fs::file_size(fname);
+          const size_t memcpy_sz =
+              fname == "" ? (erange.end - erange.start) : fs::file_size(fname);
 
           /* Copy all the allocated bytes from the actual file to the backing */
           DBGH(4) << "Calling real_memcpy(" << dst << ", " << src << ", "
@@ -393,12 +395,12 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   return 0;
 }
 
-int munmap (void *__addr, size_t __len) __THROW {
+int munmap(void *__addr, size_t __len) __THROW {
   DBGH(4) << "mumap intercepted\n";
   for (auto &range : cxlbuf::mapped_addr) {
-    if (__addr >= (void*)range.second.start 
-        && __addr < (void*)range.second.end) {
-      if (__addr != (void*)range.second.start) {
+    if (__addr >= (void *)range.second.range.start &&
+        __addr < (void *)range.second.range.end) {
+      if (__addr != (void *)range.second.range.start) {
         DBGE << "Unmapping part of address range not supported" << std::endl;
         exit(1);
       } else {

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -25,12 +26,20 @@ namespace nvsl {
       size_t end;
     };
 
-    /** @brief Map from file descriptor to mapped address range **/
-    extern std::unordered_map<int, addr_range_t> mapped_addr;
+    /** @brief Struct to track information about mapped pmem regions */
+    struct fd_metadata_t {
+      int fd;
+      cxlbuf::addr_range_t range;
+      std::filesystem::path fpath;
+    };
 
-    /** @brief Bump allocator for the START_ADDR -> END_ADDR mmap tracking space **/
+    /** @brief Map from file descriptor to mapped address range **/
+    extern std::unordered_map<int, fd_metadata_t> mapped_addr;
+
+    /** @brief Bump allocator for the START_ADDR -> END_ADDR mmap tracking space
+     * **/
     extern void *mmap_start;
 
     void init_dlsyms();
-  }
-}
+  } // namespace cxlbuf
+} // namespace nvsl
