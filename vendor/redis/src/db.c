@@ -45,6 +45,8 @@ void slotToKeyAdd(robj *key);
 void slotToKeyDel(robj *key);
 void slotToKeyFlush(void);
 
+struct timespec start, stop;
+
 /*-----------------------------------------------------------------------------
  * C-level DB API
  *----------------------------------------------------------------------------*/
@@ -780,7 +782,19 @@ void shutdownCommand(client *c) {
      * Also when in Sentinel mode clear the SAVE flag and force NOSAVE. */
     if (server.loading || server.sentinel_mode)
         flags = (flags & ~SHUTDOWN_SAVE) | SHUTDOWN_NOSAVE;
-    if (prepareForShutdown(flags) == C_OK) exit(0);
+    if (prepareForShutdown(flags) == C_OK) {
+        if (clock_gettime(CLOCK_REALTIME, &stop) == -1) {
+            perror("clock gettime");
+            exit(EXIT_FAILURE);
+        }
+
+        uint64_t accum = ( stop.tv_sec - start.tv_sec ) * 1000000000L
+            + ( stop.tv_nsec - start.tv_nsec );
+
+        fprintf(stderr, "Total time = %lu, command count =\n", accum);
+
+        exit(0);
+    }
     addReplyError(c,"Errors trying to SHUTDOWN. Check logs.");
 }
 

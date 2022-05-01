@@ -4239,6 +4239,13 @@ int main(int argc, char **argv) {
     }
 
     aeSetBeforeSleepProc(server.el,beforeSleep);
+    
+    if (clock_gettime( CLOCK_REALTIME, &start) == -1) {
+      perror( "clock gettime" );
+      exit( EXIT_FAILURE );
+    }
+
+
     aeMain(server.el);
     aeDeleteEventLoop(server.el);
     return 0;

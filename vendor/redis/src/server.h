@@ -66,6 +66,8 @@ extern uint64_t pm_type_root_type_id;
 extern uint64_t pm_type_key_val_pair_PM;
 extern uint64_t pm_type_sds_type_id;
 extern uint64_t pm_type_emb_sds_type_id;
+extern struct timespec start;
+extern struct timespec stop;
 
 /* Type key_val_pair_PM Object */
 #define PM_TYPE_KEY_VAL_PAIR_PM pm_type_key_val_pair_PM

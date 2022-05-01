@@ -16,3 +16,6 @@
 [submodule "vendor/redis/deps/pmdk"]
 	path = vendor/redis/deps/pmdk
 	url = git@github.com:pmem/pmdk.git
+[submodule "vendor/preeny"]
+	path = vendor/preeny
+	url = git@github.com:zardus/preeny.git
