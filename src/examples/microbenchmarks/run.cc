@@ -9,6 +9,6 @@
 #include "run.hh"
 
 int main() {
+  mb_clwbvsntstore();
   mb_clwbsfencedist();
 }
-

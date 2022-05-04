@@ -9,3 +9,4 @@
 #pragma once
 
 void mb_clwbsfencedist();
+void mb_clwbvsntstore();
