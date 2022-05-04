@@ -327,9 +327,11 @@ cxlbuf::PmemFile::PmemFile(const fs::path &path, void *addr, size_t len)
   }
 }
 
-void cxlbuf::PmemFile::set_addr(void *addr) { this->addr = addr; }
+void cxlbuf::PmemFile::set_addr(void *addr) {
+  this->addr = addr;
+}
 
-void cxlbuf::PmemFile::write_dependency() {
+void cxlbuf::PmemFile::write_dependency_internal() {
   const int fd = open(this->get_dependency_fname().c_str(),
                       O_CREAT | O_APPEND | O_RDWR, 0666);
 
@@ -341,7 +343,8 @@ void cxlbuf::PmemFile::write_dependency() {
   const int pid = getpid();
   const pthread_t tid = pthread_self();
 
-  const auto entry = S(pid) + "," + S(tid) + "," + S((uint64_t)this->addr) + "\n";
+  const auto entry =
+      S(pid) + "," + S(tid) + "," + S((uint64_t)this->addr) + "\n";
 
   const auto bytes = write(fd, entry.c_str(), strlen(entry.c_str()));
 
@@ -351,6 +354,12 @@ void cxlbuf::PmemFile::write_dependency() {
   }
 
   close(fd);
+}
+
+void cxlbuf::PmemFile::write_dependency() {
+  if (this->get_dependency_fname() != "-dependencies.txt") {
+    this->write_dependency_internal();
+  }
 }
 
 void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
@@ -367,7 +376,9 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
           << std::endl;
   void *result = real_mmap(this->addr, this->len, prot, flags, fd, off);
 
-  if (result != nullptr) {
+  if (result == nullptr) {
+    DBGW << "Call to mmap failed" << std::endl;
+  } else if (fd != -1) {
     const cxlbuf::addr_range_t range = {
         (size_t)(this->addr), (size_t)((char *)this->addr + this->len)};
     const cxlbuf::fd_metadata_t fd_metadata = {
@@ -385,13 +396,13 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
       system(("ls -lah /proc/" + std::to_string(getpid()) + "/fd >&2").c_str());
       exit(1);
     }
-  } else {
-    DBGW << "Call to mmap failed" << std::endl;
   }
 
   /* Add an entry for this process to the dependency file. This will allow us
      to locate the logs when the file is openede after a crash */
-  this->write_dependency();
+  if (fd != -1) {
+    this->write_dependency();
+  }
 
   return result;
 }

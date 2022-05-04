@@ -35,13 +35,12 @@
   else if (0) {
 
 // TODO Do an actual call to snapshot
-#define TX_END                                                  \
-  }                                                             \
-  tx_tls_obj.level--;                                           \
-  fprintf(stderr, "tx_tls_obj.level = %d\n", tx_tls_obj.level); \
-  if (tx_tls_obj.level == 0) {                                  \
-    mmf_snapshot(tx_tls_obj.mmf_obj);                           \
-    tx_tls_obj.mmf_obj = NULL;                                  \
+#define TX_END                        \
+  }                                   \
+  tx_tls_obj.level--;                 \
+  if (tx_tls_obj.level == 0) {        \
+    mmf_snapshot(tx_tls_obj.mmf_obj); \
+    tx_tls_obj.mmf_obj = NULL;        \
   }
 
 #define TX_FREE(o) pmemobj_tx_free(o.oid)

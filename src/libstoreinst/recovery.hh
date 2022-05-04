@@ -47,8 +47,8 @@ namespace nvsl {
       /**
        * @brief Get the mapping addr and length for this file
        */
-      std::pair<void*, size_t> get_map_dimensions() const;
-      
+      std::pair<void *, size_t> get_map_dimensions() const;
+
       /**
        * @brief Add pid.tid entry to the dependency file
        *
@@ -57,15 +57,21 @@ namespace nvsl {
        * crash.
        */
       void write_dependency();
+
+      /**
+       * @brief Function to actually write to the dependency file
+       */
+      void write_dependency_internal();
+
     public:
       /**
        * @brief Try recovery and creating backing files
        */
-      PmemFile(const fs::path &path, void* addr, size_t len);
+      PmemFile(const fs::path &path, void *addr, size_t len);
       void create_backing_file();
       void map_backing_file();
       void *map_to_page_cache(int flags, int prot, int fd, off_t off);
-      void set_addr(void* addr);
+      void set_addr(void *addr);
     };
   } // namespace cxlbuf
 } // namespace nvsl

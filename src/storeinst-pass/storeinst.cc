@@ -47,6 +47,8 @@ namespace {
 size_t modCount = 0, skipCount = 0, skipFn = 0, aliasedLocationFound = 0,
        exactLocationMatchFound = 0;
 
+const char *DontAutoLogStr = "CXLBUF_DONT_AUTO_LOG";
+
 static void log(char *msg, ...) {
   va_list(arg);
   va_start(arg, msg);
@@ -91,6 +93,34 @@ bool writesToStackLocation(AAResults &aa, const StoreInst *si,
         aliasedLocationFound++;
         result = true;
         break;
+      }
+    }
+  }
+
+  return result;
+}
+
+std::set<Function *> getAnnotatedFunctions(Module *M) {
+  std::set<Function *> result;
+
+  for (Module::global_iterator I = M->global_begin(), E = M->global_end();
+       I != E; ++I) {
+
+    if (I->getName() == "llvm.global.annotations") {
+      ConstantArray *CA = dyn_cast<ConstantArray>(I->getOperand(0));
+      for (auto OI = CA->op_begin(); OI != CA->op_end(); ++OI) {
+        ConstantStruct *CS = dyn_cast<ConstantStruct>(OI->get());
+        Function *F = dyn_cast<Function>(CS->getOperand(0)->getOperand(0));
+        GlobalVariable *AnnotationGL =
+            dyn_cast<GlobalVariable>(CS->getOperand(1)->getOperand(0));
+        StringRef annotation =
+            dyn_cast<ConstantDataArray>(AnnotationGL->getInitializer())
+                ->getAsCString();
+        if (annotation.compare(DontAutoLogStr) == 0) {
+          result.insert(F);
+          log((char *)"Found annotated function %s",
+              demangleSym(F->getName().str()).c_str());
+        }
       }
     }
   }

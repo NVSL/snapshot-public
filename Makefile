@@ -3,7 +3,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 .PHONY: all
 all: bin lib | check_compiler
 	$(PUDDLES_MAKE) -C src
-#	$(PUDDLES_MAKE) vendor
+	$(PUDDLES_MAKE) vendor
 
 .PHONY: vendor
 vendor:
