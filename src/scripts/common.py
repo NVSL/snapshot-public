@@ -144,12 +144,15 @@ class Fig(object):
         
         self.ax = ax
 
-    def get_kwargs(bar=True, **kwargs):
+    def get_kwargs(bar=True, nofigsize=False, **kwargs):
         result = {
             'fontsize': Fig.fontsize_gbl, 
             'figsize': Fig.figsize_gbl,
             'zorder': 3,
         }
+        
+        if nofigsize:
+            del result['figsize']
         
         if bar:
             result['edgecolor'] = 'black'
