@@ -5,7 +5,7 @@ ifdef RELEASE
 VISBILITY_HIDDEN := -fvisibility=hidden
 endif
 
-%.o: %.cc $(DEPS_DIR)/%.d | $(DEPS_DIR)
+%.o.no_sync %.o: %.cc | $(DEPS_DIR)
 	$(PUDDLES_CXX) $(INCLUDE) -mclwb -mavx -mavx2 -c $(CXXFLAGS)\
 		$(PUDDLES_CXXFLAGS) $< -MT $@ -o $@ -MMD -MP -MF $(DEPS_DIR)/$*.d
 
