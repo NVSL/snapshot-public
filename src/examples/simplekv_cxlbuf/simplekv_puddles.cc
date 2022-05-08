@@ -20,10 +20,10 @@
 
 #include "simplekv_puddles.hh"
 
-constexpr size_t MIN_POOL_SZ = (20 * 1024 * 1024);
+constexpr size_t MIN_POOL_SZ = (102 * 1024 * 1024);
 size_t cur_ator_head = 0;
 
-using kv_type = simple_kv<int, 1000>;
+using kv_type = simple_kv<int, 1800>;
 
 void *alloc(void *region, size_t bytes) {
   cur_ator_head += bytes;

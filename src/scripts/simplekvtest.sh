@@ -8,6 +8,7 @@ YCSB_LOC="/home/smahar/git/libpuddles-scripts/traces/"
 PMDK_POOL="/mnt/pmem0/simplekv"
 
 YCSB_WRKLD="a b c d e f g"
+# YCSB_WRKLD="a c g"
 
 OPS=100000
 
@@ -42,6 +43,7 @@ remake() {
     if [ "$V" = "1" ]; then 
         recompile
     else
+        echo "Recompiling $(dirname "$CONFIG_FILE") ..." >&2
         recompile >/dev/null 2>&1
     fi
 }

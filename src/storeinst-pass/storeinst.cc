@@ -165,8 +165,11 @@ struct HelloWorld : PassInfoMixin<HelloWorld> {
     FunctionAnalysisManager &fam =
         mam.getResult<FunctionAnalysisManagerModuleProxy>(m).getManager();
 
+    auto annotFuncs = getAnnotatedFunctions(&m);
+
     for (auto fi = m.begin(); fi != m.end(); ++fi) {
-      if (not fi->empty()) {
+      auto &f = *fi;
+      if (not fi->empty() and annotFuncs.find(&f) == annotFuncs.end()) {
         assert(not fam.empty());
         auto demangledName = demangleSym(fi->getName().str());
         auto &aam = fam.getResult<AAManager>(*fi);

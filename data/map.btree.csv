@@ -1,4 +1,4 @@
 operation,pmdk,snapshot
-insert,1.491580,.9389
-delete,2.133221,.5256
-read,0.293555,.0842
+insert,1.267168,.5436
+delete,1.474057,.4884
+read,0.284706,.0806

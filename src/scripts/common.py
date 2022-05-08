@@ -164,19 +164,24 @@ class Fig(object):
 
         return self
 
-    def fmt_legend(self, loc='upper center', mask=None):
-        if loc != 'upper center':
+    def fmt_legend(self, **kwargs):
+        kwargs = dict(kwargs)
+        if 'loc' not in kwargs:
+            kwargs['loc'] = 'upper center'
+        
+        if kwargs['loc'] != 'upper center':
             raise Exception("Unimplemented")
 
         bbox_to_anchor = (0, 0)
 
-        if loc == 'upper center':
-            bbox_to_anchor = (0.5, 1.55)
+        if kwargs['loc'] == 'upper center':
+            bbox_to_anchor = (0.5, 1.45)
 
         handles, labels = self.ax.get_legend_handles_labels()
         
         # Get the handles to format them in case asked to apply a mask
-        if mask != None:
+        mask = kwargs['mask'] if 'mask' in kwargs else None
+        if mask:
             if len(mask) != len(handles):
                 raise Exception("Mask length should be same as the number of handles")
             
@@ -190,15 +195,30 @@ class Fig(object):
             handles = new_handles
             labels = new_labels
             
+        if 'fontsize' not in kwargs:
+            kwargs['fontsize'] = Fig.fontsize_gbl
+            
+        if 'fancybox' not in kwargs:
+            kwargs['fancybox'] = False
+            
+        if 'framealpha' not in kwargs:
+            kwargs['framealpha'] = 1
+            
+        if 'ncol' not in kwargs:
+            kwargs['ncol'] = 3
+        
+        if 'loc' not in kwargs:
+            kwargs['loc'] = 'upper center'
+        
+        if 'bbox_to_anchor' not in kwargs:
+            kwargs['bbox_to_anchor'] = bbox_to_anchor
+        
+        if 'edgecolor' not in kwargs:
+            kwargs['edgecolor'] = 'black'
+            
         _ = self.ax.legend(
-            handles=handles,
-            fontsize=Fig.fontsize_gbl, 
-            fancybox=False, 
-            framealpha=1, 
-            ncol=3, 
-            loc='upper center', 
-            bbox_to_anchor=bbox_to_anchor, 
-            edgecolor='black'
+            handles = handles,
+            **kwargs
         )
 
         return self

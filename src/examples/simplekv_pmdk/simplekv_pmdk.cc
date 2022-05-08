@@ -15,7 +15,7 @@
 
 #include "simplekv_pmdk.hh"
 
-using kv_type = simple_kv<int, 1000>;
+using kv_type = simple_kv<int, 1800>;
 
 struct root {
   pmem::obj::persistent_ptr<kv_type> kv;

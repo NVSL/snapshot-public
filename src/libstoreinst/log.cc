@@ -37,7 +37,10 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 
   if (log_area != nullptr and cxlModeEnabled) {
     storeInstEnabled = true;
+
+#ifdef CXLBUF_TESTING_GOODIES
     perst_overhead_clk->tick();
+#endif // CXLBUF_TESTING_GOODIES
 
     NVSL_ASSERT((bytes < (1 << 23)), "Log request to location " +
                                          S((void *)start) + " for " + S(bytes) +
@@ -105,7 +108,10 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 #endif
 
     NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
+
+#ifdef CXLBUF_TESTING_GOODIES
     perst_overhead_clk->tock();
+#endif // CXLBUF_TESTING_GOODIES
   }
 }
 

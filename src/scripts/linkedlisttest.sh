@@ -58,9 +58,9 @@ execute() {
     cxlbuf=$(printf "$OP" | CXLBUF_LOG_LOC="${CXLBUF_LOG_LOC}" CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
-    printf "${cxlbuf},\n"
+    printf "${cxlbuf},"
 
-    return
+    # return
 
     rm -f "${PMDK_POOL}*"
     rm -rf "${CXLBUF_LOG_LOC}"

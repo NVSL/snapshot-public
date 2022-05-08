@@ -18,9 +18,9 @@
 
 using namespace nvsl;
 
-constexpr size_t MAX_UPDATES = 6000;
+constexpr size_t MAX_UPDATES = 60000;
 constexpr size_t FLUSH_SZ_START = 1;  // Cacheliness
-constexpr size_t FLUSH_SZ_END = 128;  // 1024; // Cacheliness
+constexpr size_t FLUSH_SZ_END = 1024; // Cacheliness
 constexpr size_t DRAIN_DST_START = 1; // Writes
 constexpr size_t DRAIN_DST_END = 256; // Writes
 constexpr size_t DRAIN_DST_INCR = 2;  // Writes
@@ -36,7 +36,7 @@ void mb_clwbvsntstore() {
     exit(1);
   }
 
-  constexpr size_t MMAP_SIZE = 1024UL * 1024 * 4096;
+  constexpr size_t MMAP_SIZE = 1024UL * 1024 * 4096 * 16;
 
   lseek(fd, MMAP_SIZE + 1, SEEK_SET);
   write(fd, 0, 1);
@@ -77,6 +77,9 @@ void mb_clwbvsntstore() {
       pmemops.flush(pm, MMAP_SIZE);
       pmemops.drain();
 
+      std::cerr << flush_sz_bytes << ", " << clk.ns() / (double)MAX_UPDATES
+                << std::endl;
+
       results[flush_sz_bytes][0].push_back(clk.ns() / (double)MAX_UPDATES);
     }
   }
@@ -102,6 +105,10 @@ void mb_clwbvsntstore() {
         if (i % drain_dst == 0) pmemops.drain();
       }
       clk.tock();
+
+      pmemops.flush(pm, MMAP_SIZE);
+      pmemops.drain();
+
       results[flush_sz_bytes][1].push_back(clk.ns() / (double)MAX_UPDATES);
     }
   }

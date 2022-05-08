@@ -336,7 +336,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
           str_wr_allowed = dst_addr % entry.bytes == 0;
         }
 
-        if (entry.bytes >= 8 and entry.bytes < 256 and str_wr_allowed)
+        if (entry.bytes >= 8 /*and entry.bytes < 256*/ and str_wr_allowed)
             [[likely]] {
           pmemops->streaming_wr((void *)dst_addr, (void *)(0UL + entry.addr),
                                 entry.bytes);

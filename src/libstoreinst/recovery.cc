@@ -376,7 +376,7 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
           << std::endl;
   void *result = real_mmap(this->addr, this->len, prot, flags, fd, off);
 
-  if (result == nullptr) {
+  if (result == MAP_FAILED) {
     DBGW << "Call to mmap failed" << std::endl;
   } else if (fd != -1) {
     const cxlbuf::addr_range_t range = {

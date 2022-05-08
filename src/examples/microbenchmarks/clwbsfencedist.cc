@@ -26,7 +26,7 @@ void mb_clwbsfencedist() {
   }
 
   constexpr size_t MMAP_SIZE = 100 * 1024 * 4096;
-  constexpr size_t AVERAGE_CNT = 8 * 1024 * 1024;
+  constexpr size_t AVERAGE_CNT = 16 * 1024 * 1024;
 
   lseek(fd, MMAP_SIZE + 1, SEEK_SET);
   write(fd, 0, 1);
@@ -40,7 +40,7 @@ void mb_clwbsfencedist() {
 
   constexpr size_t MAX_UPDATES = 600;
 
-  std::map<size_t, std::array<double, 2>> results;
+  std::map<size_t, std::array<double, 3>> results;
 
   for (size_t i = 0; i < 400; i += 10) {
     uint64_t val[8];
@@ -80,9 +80,10 @@ void mb_clwbsfencedist() {
     for (size_t avg_i = 0; avg_i < AVERAGE_CNT; avg_i++) {
       size_t j = 0;
 
-      pmemops.streaming_wr(&arr[0], val, sizeof(val));
+      std::memcpy(&arr[0], val, sizeof(val));
+      pmemops.flush(&arr[0], sizeof(val));
 
-      for (; j < i * 1; j++) {
+      for (; j < i; j++) {
         arr[4096 + j * 64] = j;
       }
       pmemops.drain();
@@ -99,7 +100,35 @@ void mb_clwbsfencedist() {
 
   std::cerr << "=======" << std::endl;
 
+  for (size_t i = 0; i < 400; i += 10) {
+    uint64_t val[8];
+    memset(val, rand(), sizeof(val));
+
+    Clock clk;
+    clk.tick();
+    for (size_t avg_i = 0; avg_i < AVERAGE_CNT; avg_i++) {
+      size_t j = 0;
+
+      pmemops.streaming_wr(&arr[0], val, sizeof(val));
+
+      for (; j < i * 1; j++) {
+        arr[4096 + j * 64] = j;
+      }
+      pmemops.drain();
+
+      for (; j < MAX_UPDATES; j++) {
+        arr[4096 + j * 64] = j;
+      }
+    }
+    clk.tock();
+
+    results[i][2] = clk.ns() / (double)AVERAGE_CNT;
+    std::cerr << results[i][2] << std::endl;
+  }
+
+  std::cerr << "=======" << std::endl;
+
   for (const auto &[k, v] : results) {
-    std::cout << k << ", " << v[0] << ", " << v[1] << std::endl;
+    std::cout << k << ", " << v[0] << ", " << v[1] << ", " << v[2] << std::endl;
   }
 }

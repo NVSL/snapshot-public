@@ -108,7 +108,7 @@ namespace nvsl {
         }
 
         log_entry_iter(const pointer entry) : entry(entry) {
-#if RELEASE
+#ifndef RELEASE
           DBGH(4) << "Creating a new log entry iter for entry with address "
                   << (void *)(0UL + entry->addr) << " and content: \n"
                   << buf_to_hexstr((char *)entry->content, entry->bytes)
