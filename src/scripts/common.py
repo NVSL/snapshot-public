@@ -229,7 +229,7 @@ class Fig(object):
 
         return self
 
-    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white'):
+    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white', label_move_thresh=0.005, label_off_frac=0.1):
         rects = self.ax.patches
         mask_full = mask
         
@@ -250,7 +250,7 @@ class Fig(object):
                 mask_full += [mask[i]] * factor
 
         ylim = self.ax.get_ylim()
-        label_off = (ylim[1]-ylim[0])*0.1
+        label_off = (ylim[1] - ylim[0]) * label_off_frac
         label_pos = ylim[1] + label_off
         
         i = 0
@@ -263,10 +263,10 @@ class Fig(object):
                 
             # If the label is with the bar, get the bar height
             if not over_fig:
-                label_pos = height + label_off*0.5
+                label_pos = ylim[0] + height + label_off*0.5
 
                 # If the label overlaps with the border, move it over
-                if abs(label_pos - ylim[1]) < (ylim[1]-ylim[0])*0.05:
+                if abs(label_pos - ylim[1]) < (ylim[1]-ylim[0])*label_move_thresh:
                     label_pos = ylim[1] + label_off
                 
             label = round(height, precision)
