@@ -6,13 +6,13 @@
  * @brief  Handles all the recovery stuff
  */
 
-#include "recovery.hh"
 #include "libc_wrappers.hh"
 #include "libstoreinst.hh"
 #include "libvram/libvram.hh"
 #include "log.hh"
 #include "nvsl/string.hh"
 #include "nvsl/utils.hh"
+#include "recovery.hh"
 #include "utils.hh"
 
 #include <fcntl.h>
@@ -20,6 +20,10 @@
 #include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <unordered_set>
+
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#endif // MAP_HUGE_2MB
 
 using namespace nvsl;
 
@@ -267,6 +271,7 @@ void cxlbuf::PmemFile::map_backing_file() {
   int bck_flags = 0;
   bck_flags |= MAP_SHARED_VALIDATE;
   bck_flags |= MAP_SYNC;
+  bck_flags |= MAP_HUGE_2MB | MAP_HUGETLB;
 
   DBGH(3) << "Calling mmap for backing: "
           << mmap_to_str(bck_addr, this->len, PROT_READ | PROT_WRITE, bck_flags,
@@ -282,6 +287,7 @@ void cxlbuf::PmemFile::map_backing_file() {
       DBGE << PSTR() << "\n";
       exit(1);
     }
+
     mbck_addr = nvsl::libvram::malloc(this->len);
 
     /* Set the backing_file_start to let the logging mechanism copy content into
@@ -309,6 +315,14 @@ void cxlbuf::PmemFile::map_backing_file() {
   } else {
     DBGH(2) << "Backing file " << bfname << " for " << fs::path(this->path)
             << " mapped at address " << mbck_addr << std::endl;
+
+    int mret = madvise(mbck_addr, this->len, MADV_HUGEPAGE);
+    if (mret == -1) {
+      DBGE << "Unable to set madvise for the backing file"
+           << "\n";
+      DBGE << PSTR() << "\n";
+      exit(1);
+    }
   }
 
   DBGH(4) << "Trying to write to the backing file...";
@@ -378,6 +392,7 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
 
   if (result == MAP_FAILED) {
     DBGW << "Call to mmap failed" << std::endl;
+    DBGW << PSTR() << "\n";
   } else if (fd != -1) {
     const cxlbuf::addr_range_t range = {
         (size_t)(this->addr), (size_t)((char *)this->addr + this->len)};
@@ -395,6 +410,15 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
       system(("cat /proc/" + std::to_string(getpid()) + "/maps >&2").c_str());
       system(("ls -lah /proc/" + std::to_string(getpid()) + "/fd >&2").c_str());
       exit(1);
+    }
+
+    if (cxlModeEnabled) {
+      int mret = madvise(result, this->len, MADV_HUGEPAGE);
+      if (mret == -1) {
+        DBGE << "Unable to madvise page cache mapping\n";
+        DBGE << PSTR() << "\n";
+        exit(1);
+      }
     }
   }
 

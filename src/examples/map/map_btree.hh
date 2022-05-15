@@ -10,4 +10,4 @@
 
 #include "map.hh"
 
-MapOps *map_btree(bip::managed_mapped_file *res);
+MapOps *map_btree(mmf *res);

@@ -24,6 +24,7 @@ using namespace nvsl;
 
 /*-- LIBC functions BEGIN --*/
 typedef void *(*memcpy_sign)(void *, const void *, size_t);
+typedef void *(*memset_sign)(void *s, int c, size_t n);
 typedef void *(*mmap_sign)(void *, size_t, int, int, int, __off_t);
 typedef void *(*mremap_sign)(void *__addr, size_t __old_len, size_t __new_len,
                              int __flags, ...);
@@ -34,6 +35,7 @@ typedef int (*msync_sign)(void *addr, size_t length, int flags);
 
 void *(*real_memcpy)(void *, const void *, size_t) = nullptr;
 void *(*real_memmove)(void *, const void *, size_t) = nullptr;
+void *(*real_memset)(void *s, int c, size_t n) = nullptr;
 void *(*real_mmap)(void *__addr, size_t __len, int __prot, int __flags,
                    int __fd, __off_t __offset) = nullptr;
 void *(*real_mremap)(void *__addr, size_t __old_len, size_t __new_len,
@@ -64,6 +66,12 @@ void cxlbuf::init_dlsyms() {
   real_memmove = (memcpy_sign)dlsym(RTLD_NEXT, "memmove");
   if (real_memmove == nullptr) {
     DBGE << "dlsym failed for memmove: %s\n" << std::string(dlerror()) << "\n";
+    exit(1);
+  }
+
+  real_memset = (memset_sign)dlsym(RTLD_NEXT, "memset");
+  if (real_memset == nullptr) {
+    DBGE << "dlsym failed for memset: %s\n" << std::string(dlerror()) << "\n";
     exit(1);
   }
 
@@ -140,6 +148,12 @@ void *memmove(void *__restrict dst, const void *__restrict src,
   return real_memmove(dst, src, n);
 }
 
+void *memset(void *s, int c, size_t n) {
+//  fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
+//          n / 1024);
+  return real_memset(s, c, n);
+}
+
 void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
            __off_t __offset) __THROW {
   /* Read the file name for the fd */
@@ -175,10 +189,10 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   return result;
 }
 
-void *mmap64(void *addr, size_t len, int prot, int flags, int fd, __off64_t off)
-  __THROW {
+void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
+             __off64_t off) __THROW {
   return mmap(addr, len, prot, flags, fd, off);
-} 
+}
 
 void sync(void) __THROW {
   DBGE << "Call to sync intercepted\n";
@@ -213,8 +227,8 @@ int fsync(int __fd) __THROW {
   }
 }
 
-void *mremap (void *__addr, size_t __old_len, size_t __new_len,
-              int __flags, ...) __THROW {
+void *mremap(void *__addr, size_t __old_len, size_t __new_len, int __flags,
+             ...) __THROW {
   DBGE << "Unimplemented\n";
   exit(1);
   return real_mremap(__addr, __old_len, __new_len, __flags);
@@ -331,13 +345,12 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
         /* Streaming write is only allowed if the write size is a power of two
            (popcount == 1) and dest address is aligned at entry.bytes */
-        bool str_wr_allowed = false;
-        if (std::popcount(entry.bytes) == 1) {
-          str_wr_allowed = dst_addr % entry.bytes == 0;
-        }
+        const bool str_wr_allowed =
+            (std::popcount(entry.bytes) == 1) and (dst_addr % entry.bytes == 0);
 
-        if (entry.bytes >= 8 /*and entry.bytes < 256*/ and str_wr_allowed)
-            [[likely]] {
+        DBGH(4) << "Streaming write allowed? " << str_wr_allowed << "\n";
+
+        if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
           pmemops->streaming_wr((void *)dst_addr, (void *)(0UL + entry.addr),
                                 entry.bytes);
         } else {

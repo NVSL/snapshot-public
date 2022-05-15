@@ -14,21 +14,25 @@
 #include <string>
 #include <vector>
 
+#include <boost/interprocess/indexes/iset_index.hpp>
+#include <boost/interprocess/interprocess_fwd.hpp>
 #include <boost/interprocess/managed_mapped_file.hpp>
+#include <boost/interprocess/mem_algo/rbtree_best_fit.hpp>
+#include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
+#include <boost/interprocess/sync/mutex_family.hpp>
 
 #include "map.hh"
 #include "map_btree.hh"
 #include "nvsl/clock.hh"
 
-constexpr size_t MIN_POOL_SZ = 1024*1024;
+constexpr size_t MIN_POOL_SZ = 1024 * 1024UL * 160;
 
 using namespace std::chrono;
 using namespace nvsl;
 
-namespace bip = boost::interprocess;
 extern bool startTracking;
 
-bip::managed_mapped_file *tls_res;
+mmf *tls_res;
 
 void print_help() {
   // clang-format off
@@ -99,13 +103,14 @@ std::vector<std::string> split(const std::string &text, char sep) {
   return tokens;
 }
 
-void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
+void perform_bulk_ops(mmf *res, const args_t &args, MapRoot *root_ptr) {
   nvsl::Clock clk;
   switch (args.bulk_op[0]) {
   case 'i':
     clk.tick();
     for (size_t i = 0; i < args.bulk_cnt; i++) {
       root_ptr->mapops->insert(root_ptr, rand(), 0);
+      msync(res->get_address(), res->get_size(), MS_SYNC);
     }
     clk.reconcile();
     clk.tock();
@@ -118,13 +123,16 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
       for (size_t i = 0; i < args.bulk_cnt; i++) {
         keys.push_back(rand());
         root_ptr->mapops->insert(root_ptr, keys.back(), 0);
+        msync(res->get_address(), res->get_size(), MS_SYNC);
       }
+
+      std::cout << "Allocated all nodes" << std::endl;
 
       clk.tick();
       for (size_t i = 0; i < args.bulk_cnt; i++) {
         root_ptr->mapops->remove(root_ptr, keys[i]);
+        msync(res->get_address(), res->get_size(), MS_SYNC);
       }
-      clk.reconcile();
       clk.tock();
     }
     break;
@@ -158,16 +166,13 @@ void perform_bulk_ops(const args_t &args, MapRoot *root_ptr) {
 int main(int argc, char *argv[]) {
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
 
-  auto *res = new bip::managed_mapped_file(bip::open_or_create, 
-                                           args.puddle_path.c_str(),
-                                           MIN_POOL_SZ * 1000);
-
+  auto *res =
+      new mmf(bip::open_or_create, args.puddle_path.c_str(), MIN_POOL_SZ);
   tls_res = res;
-  
-  std::cerr << "reservoir addr = " << (void *)res << std::endl;
+
+  std::cerr << "reservoir addr = " << (void *)res->get_address() << std::endl;
 
   auto *root_ptr = res->find<MapRoot>("root").first;
-  // auto root_ptr = res->get_root<MapRoot>();
 
   if (root_ptr == NULL) {
     std::cout << "Allocating root" << std::endl;
@@ -189,11 +194,11 @@ int main(int argc, char *argv[]) {
   size_t op_count = 0;
   startTracking = true;
 
-  root_ptr->mapops->insert(root_ptr, 0, 0);
+  root_ptr->mapops->insert(root_ptr, UINT64_MAX, 0);
   msync(res->get_address(), res->get_size(), MS_SYNC);
 
   if (args.bulk) {
-    perform_bulk_ops(args, root_ptr);
+    perform_bulk_ops(res, args, root_ptr);
   } else {
     printf("Type 'h' for help\n$ ");
 
@@ -207,55 +212,55 @@ int main(int argc, char *argv[]) {
       }
 
       // TX_BEGIN(res) {
-        op_count++;
+      op_count++;
 
-        switch (buf[0]) {
-        case 'i':
-          {
-            if (strlen(buf) < 3) {
-              print_help();
-              break;
-            }
-
-            auto arg = std::string(buf + 1);
-            root_ptr->mapops->insert(root_ptr, std::stoull(arg), 0);
-            msync(res->get_address(), res->get_size(), MS_SYNC);
+      switch (buf[0]) {
+      case 'i':
+        {
+          if (strlen(buf) < 3) {
+            print_help();
             break;
           }
-        case 'p':
-          {
-            MapOps::foreach_cb cb = [](uint64_t k, uint64_t v, void *_) -> int {
-              std::cout << k << " ";
-              return 0;
-            };
 
-            root_ptr->mapops->foreach (root_ptr, cb);
-
-            std::cout << std::endl;
-
-            break;
-          }
-        case 'r':
-          {
-            if (strlen(buf) < 4) {
-              print_help();
-              break;
-            }
-
-            const auto arg = std::string(buf + 1);
-            const auto arg_u64 = std::stoull(arg);
-            root_ptr->mapops->remove(root_ptr, arg_u64);
-            msync(res->get_address(), res->get_size(), MS_SYNC);
-
-            break;
-          }
-        case 'h':
-          print_help();
-          break;
-        default:
-          std::cout << "Unknown command, press 'h' for help" << std::endl;
+          auto arg = std::string(buf + 1);
+          root_ptr->mapops->insert(root_ptr, std::stoull(arg), 0);
+          msync(res->get_address(), res->get_size(), MS_SYNC);
           break;
         }
+      case 'p':
+        {
+          MapOps::foreach_cb cb = [](uint64_t k, uint64_t v, void *_) -> int {
+            std::cout << k << " ";
+            return 0;
+          };
+
+          root_ptr->mapops->foreach (root_ptr, cb);
+
+          std::cout << std::endl;
+
+          break;
+        }
+      case 'r':
+        {
+          if (strlen(buf) < 4) {
+            print_help();
+            break;
+          }
+
+          const auto arg = std::string(buf + 1);
+          const auto arg_u64 = std::stoull(arg);
+          root_ptr->mapops->remove(root_ptr, arg_u64);
+          msync(res->get_address(), res->get_size(), MS_SYNC);
+
+          break;
+        }
+      case 'h':
+        print_help();
+        break;
+      default:
+        std::cout << "Unknown command, press 'h' for help" << std::endl;
+        break;
+      }
       // }
       // TX_END;
 

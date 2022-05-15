@@ -32,19 +32,25 @@ extern nvsl::PMemOps *pmemops;
 using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
-  auto &log_entry = *RCast<log_entry_t *>(RCast<uint8_t *>(log_area->content) +
-                                          log_area->log_offset);
+  auto cxlModeEnabled_reg = cxlModeEnabled;
+  auto &log_entry = *RCast<log_entry_t *>(log_area->tail_ptr);
 
-  if (log_area != nullptr and cxlModeEnabled) {
+#ifndef NDEBUG
+  NVSL_ASSERT(log_area != nullptr, "Logging called without a log area");
+#endif
+
+  if (cxlModeEnabled_reg) [[likely]] {
     storeInstEnabled = true;
 
 #ifdef CXLBUF_TESTING_GOODIES
     perst_overhead_clk->tick();
 #endif // CXLBUF_TESTING_GOODIES
 
+#ifndef NDEBUG
     NVSL_ASSERT((bytes < (1 << 23)), "Log request to location " +
                                          S((void *)start) + " for " + S(bytes) +
                                          " bytes is invalid");
+#endif
 
 #ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
@@ -59,6 +65,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 
     const size_t entry_sz = sizeof(log_entry_t) + bytes;
     log_area->log_offset += entry_sz;
+    log_area->tail_ptr += entry_sz;
 
     const size_t cls_to_flush =
         (log_area->log_offset - last_flush_offset + 63) / 64;
@@ -206,6 +213,9 @@ void cxlbuf::Log::init_thread_buf() {
     perror("mmap for buffer failed");
     exit(1);
   }
+
+  log_area->log_offset = 0;
+  log_area->tail_ptr = RCast<uint8_t *>(log_area->content);
 
   close(fd);
 }

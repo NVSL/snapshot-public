@@ -58,6 +58,7 @@ namespace nvsl {
       struct log_layout_t {
         State state;
         uint64_t log_offset;
+        uint8_t *tail_ptr; /*<< Volatile use only, points to the tail entry */
 
         NVSL_BEGIN_IGNORE_WPEDANTIC
         log_entry_t content[];
@@ -165,6 +166,7 @@ namespace nvsl {
 
       void clear() {
         log_area->log_offset = 0;
+        log_area->tail_ptr = RCast<uint8_t *>(log_area->content);
         last_flush_offset = 0;
 
 #ifdef LOG_FORMAT_VOLATILE

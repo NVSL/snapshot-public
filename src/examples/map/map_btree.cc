@@ -11,37 +11,37 @@
 // #include "libpuddles/libpuddles.h"
 #include <memory>
 
-void insert(bip::managed_mapped_file *res, void *tree, uint64_t key, uint64_t val) {
+void insert(mmf *res, void *tree, uint64_t key, uint64_t val) {
   auto tree_btree = (btree_t *)(tree);
 
   tree_btree->insert(res, key, val);
 }
 
-void remove(bip::managed_mapped_file *res, void *tree, uint64_t key) {
+void remove(mmf *res, void *tree, uint64_t key) {
   auto tree_btree = (btree_t *)(tree);
 
   tree_btree->remove(res, key);
 }
 
-uint64_t get(bip::managed_mapped_file *res, void *tree, uint64_t key) {
+uint64_t get(mmf *res, void *tree, uint64_t key) {
   auto tree_btree = (btree_t *)(tree);
 
   return tree_btree->get(key);
 }
 
-bool lookup(bip::managed_mapped_file *res, void *tree, uint64_t key) {
+bool lookup(mmf *res, void *tree, uint64_t key) {
   auto tree_btree = (btree_t *)tree;
 
   return tree_btree->btree_map_lookup(key);
 }
 
-void foreach (bip::managed_mapped_file *res, void *tree, MapOps::foreach_cb cb) {
+void foreach (mmf *res, void *tree, MapOps::foreach_cb cb) {
   auto tree_btree = (btree_t *)tree;
 
   tree_btree->foreach (cb, nullptr);
 }
 
-MapOps *map_btree(bip::managed_mapped_file *res) {
+MapOps *map_btree(mmf *res) {
   auto result = new MapOps;
 
   result->insert = [res](void *tree, uint64_t key, uint64_t val) mutable {

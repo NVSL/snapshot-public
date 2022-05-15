@@ -23,7 +23,7 @@ else
     CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs"
 fi
 
-OPS=$HUNDRED_K
+OPS=$MILLION
 
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
@@ -47,7 +47,7 @@ execute() {
     rm -rf "${CXLBUF_LOG_LOC}"
 
     #pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
-    
+
     pmdk=$(printf "$OP" | LD_PRELOAD="${LD_PRELOAD}" "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
@@ -60,9 +60,7 @@ execute() {
 
     printf "${cxlbuf},"
 
-    # return
-
-    rm -f "${PMDK_POOL}*"
+    rm -f "${PMDK_POOL}"*
     rm -rf "${CXLBUF_LOG_LOC}"
     printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
