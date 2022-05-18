@@ -1,4 +1,4 @@
-operation,pmdk,snapshot
-insert,1.267168,.5436
-delete,1.474057,.4884
-read,0.284706,.0806
+operation,pmdk,snapshot,msync,msync huge pages
+insert,1.307747,1.1893,2.3247,59.6691
+delete,1.477636,1.6479,4.1959,90.5175
+read,0.286011,.0653,.0710,.0599

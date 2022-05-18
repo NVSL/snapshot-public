@@ -15,6 +15,7 @@ OPS=100000
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
 export CXL_MODE_ENABLED=0
+export CXLBUF_USE_HUGEPAGE=1
 
 set -e
 set -o pipefail
@@ -74,18 +75,38 @@ execute() {
     rm -f "${PMDK_POOL}"*
     rm -f "${LOG_LOC}"
 
+    CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
+                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+        | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
+
+    printf ","
+
+    rm -f "${PMDK_POOL}"*
+    rm -f "${LOG_LOC}"
+
+    CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
+                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+        | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
+
+    printf ","
+
+    rm -f "${PMDK_POOL}"*
+    rm -f "${LOG_LOC}"
+
     printf "\n"
 }
 
 remake volatile
-printf "pmdk,snashot,msync\n"
+printf "pmdk,snashot,msync,msync huge page\n"
 for wrkld in $YCSB_WRKLD; do
     execute
 done
 
 
 remake nonvolatile
-printf "pmdk,snashot,msync\n"
+printf "pmdk,snashot,msync,msync huge page\n"
 for wrkld in $YCSB_WRKLD; do
     execute
 done

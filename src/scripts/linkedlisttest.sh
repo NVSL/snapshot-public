@@ -28,7 +28,7 @@ OPS=$MILLION
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
 export CXL_MODE_ENABLED=0
-
+export CXLBUF_USE_HUGEPAGE=1
 set -e
 # set -x
 
@@ -62,13 +62,20 @@ execute() {
 
     rm -f "${PMDK_POOL}"*
     rm -rf "${CXLBUF_LOG_LOC}"
+    printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
+        | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
+
+    printf ","
+
+    rm -f "${PMDK_POOL}"*
+    rm -rf "${CXLBUF_LOG_LOC}"
     printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf "\n"
 }
 
-printf "workload,pmdk,snashot,msync\n"
+printf "workload,pmdk,snashot,msync,msync huge page\n"
 execute "A $OPS" 1 "insert"
 execute "A $OPS\nR $OPS" 2 "delete"
 execute 'A '$OPS'\ns' 2 "traverse"

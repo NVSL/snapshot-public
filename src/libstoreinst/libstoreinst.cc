@@ -38,7 +38,7 @@ namespace nvsl {
   namespace cxlbuf {
     std::string *log_loc;
     void *backing_file_start;
-  }
+  } // namespace cxlbuf
 } // namespace nvsl
 
 extern "C" {
@@ -157,7 +157,9 @@ __attribute__((unused)) void checkMemory(void *ptr) {
       }
 #endif
     } else {
+#ifdef CXLBUF_TESTING_GOODIES
       ++*nvsl::cxlbuf::skip_check_count;
+#endif
     }
   }
 }

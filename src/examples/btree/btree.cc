@@ -41,14 +41,14 @@ void btree_t::clear_node(btree_node_t *node) {
   tls_res->deallocate(node);
 }
 
-int btree_t::clear(bip::managed_mapped_file *res) {
+int btree_t::clear(mmf *res) {
   int ret = 0;
   // TX_BEGIN(res) {
-    clear_node(root);
+  clear_node(root);
 
-    // TX_ADD(&root);
+  // TX_ADD(&root);
 
-    root = nullptr;
+  root = nullptr;
   // }
   // TX_END;
 
@@ -57,8 +57,8 @@ int btree_t::clear(bip::managed_mapped_file *res) {
 
 void btree_t::insert_node_empty_tree(btree_node_item_t item) {
   // TX_ADD(&root);
-
-  if (root == nullptr) root = (btree_node_t*)tls_res->allocate(sizeof(btree_node_t));
+  if (root == nullptr)
+    root = (btree_node_t *)tls_res->allocate(sizeof(btree_node_t));
   root->init();
   root->set_item(0, item);
 }
@@ -83,7 +83,7 @@ void btree_t::insert_node(btree_node_t *node, size_t pos,
 }
 
 btree_node_t *btree_t::split_node(btree_node_t *node, btree_node_item_t *item) {
-  auto right = (btree_node_t*)tls_res->allocate(sizeof(btree_node_t));
+  auto right = (btree_node_t *)tls_res->allocate(sizeof(btree_node_t));
   right->init();
 
   int c = (BTREE_ORDER / 2);
@@ -116,7 +116,8 @@ btree_node_t *btree_t::find_dest_node(btree_node_t *node, btree_node_t *parent,
       if (key > m.key) /* select node to continue search */
         node = right;
     } else { /* replacing root node, the tree grows in height */
-      btree_node_t *up = (btree_node_t*)tls_res->allocate(sizeof(btree_node_t));
+      btree_node_t *up =
+          (btree_node_t *)tls_res->allocate(sizeof(btree_node_t));
       up->init();
       up->count = 1;
       up->items[0] = m;
@@ -165,18 +166,18 @@ bool btree_t::is_empty() {
   return root == nullptr || root->count == 0;
 }
 
-int btree_t::insert(bip::managed_mapped_file *res, uint64_t key, uint64_t value) {
+int btree_t::insert(mmf *res, uint64_t key, uint64_t value) {
   btree_node_item_t item = {key, value};
   // TX_BEGIN(res) {
-    if (is_empty()) {
-      insert_node_empty_tree(item);
-    } else {
-      size_t pos; /* position at the dest node to insert */
-      btree_node_t *parent = nullptr;
-      btree_node_t *dest = find_dest_node(root, parent, key, &pos);
+  if (is_empty()) {
+    insert_node_empty_tree(item);
+  } else {
+    size_t pos; /* position at the dest node to insert */
+    btree_node_t *parent = nullptr;
+    btree_node_t *dest = find_dest_node(root, parent, key, &pos);
 
-      insert_item(dest, pos, item);
-    }
+    insert_item(dest, pos, item);
+  }
   // }
   // TX_END;
 
@@ -340,10 +341,10 @@ uint64_t btree_t::remove_item(btree_node_t *node, btree_node_t *parent,
   return ret;
 }
 
-uint64_t btree_t::remove(bip::managed_mapped_file *res, uint64_t key) {
+uint64_t btree_t::remove(mmf *res, uint64_t key) {
   uint64_t ret = 0; // TODO: we need a not-found val
-  // TX_BEGIN(res) {
-    ret = remove_item(root, nullptr, key, 0);
+                    // TX_BEGIN(res) {
+  ret = remove_item(root, nullptr, key, 0);
   // }
   // TX_END;
 

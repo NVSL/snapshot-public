@@ -10,6 +10,7 @@
 #include "libstoreinst.hh"
 #include "libvram/libvram.hh"
 #include "log.hh"
+#include "nvsl/envvars.hh"
 #include "nvsl/string.hh"
 #include "nvsl/utils.hh"
 #include "recovery.hh"
@@ -24,6 +25,8 @@
 #ifndef MAP_HUGE_2MB
 #define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
 #endif // MAP_HUGE_2MB
+
+NVSL_DECL_ENV(CXLBUF_USE_HUGEPAGE);
 
 using namespace nvsl;
 
@@ -412,12 +415,25 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
       exit(1);
     }
 
-    if (cxlModeEnabled) {
+    if (cxlModeEnabled || get_env_val(CXLBUF_USE_HUGEPAGE_ENV)) {
       int mret = madvise(result, this->len, MADV_HUGEPAGE);
       if (mret == -1) {
         DBGE << "Unable to madvise page cache mapping\n";
         DBGE << PSTR() << "\n";
         exit(1);
+      } else {
+        DBGW << "Using huge pages\n";
+      }
+    }
+
+    if (!get_env_val(CXLBUF_USE_HUGEPAGE_ENV)) {
+      int mret = madvise(result, this->len, MADV_NOHUGEPAGE);
+      if (mret == -1) {
+        DBGE << "Unable to madvise page cache mapping\n";
+        DBGE << PSTR() << "\n";
+        exit(1);
+      } else {
+        DBGW << "Disabling huge pages\n";
       }
     }
   }

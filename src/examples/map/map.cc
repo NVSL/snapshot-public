@@ -129,7 +129,7 @@ void perform_bulk_ops(mmf *res, const args_t &args, MapRoot *root_ptr) {
       std::cout << "Allocated all nodes" << std::endl;
 
       clk.tick();
-      for (size_t i = 0; i < args.bulk_cnt; i++) {
+      for (size_t i = args.bulk_cnt - 1; i > 0; i--) {
         root_ptr->mapops->remove(root_ptr, keys[i]);
         msync(res->get_address(), res->get_size(), MS_SYNC);
       }

@@ -12,13 +12,13 @@
 #include <cstddef>
 #include <cstdint>
 
-// #include "libpuddles/libpuddles.h"
-// #include "libpuddles/reservoir.hh"
-// #include "libtx/tx.hh"
-
 namespace bip = boost::interprocess;
 
-extern bip::managed_mapped_file *tls_res;
+typedef bip::rbtree_best_fit<bip::null_mutex_family, void *> null_mutex_ator;
+typedef bip::basic_managed_mapped_file<char, null_mutex_ator, bip::iset_index>
+    mmf;
+
+extern mmf *tls_res;
 
 const size_t BTREE_ORDER = 8; /* can't be odd */
 const size_t BTREE_MIN =
@@ -46,7 +46,7 @@ struct btree_t {
 
   void clear_node(btree_node_t *node);
 
-  int clear(bip::managed_mapped_file *res);
+  int clear(mmf *res);
 
   void insert_node_empty_tree(btree_node_item_t item);
 
@@ -63,7 +63,7 @@ struct btree_t {
 
   bool is_empty();
 
-  int insert(bip::managed_mapped_file *res, uint64_t key, uint64_t value);
+  int insert(mmf *res, uint64_t key, uint64_t value);
 
   void rotate_right(btree_node_t *rsb, btree_node_t *node, btree_node_t *parent,
                     size_t pos);
@@ -83,7 +83,7 @@ struct btree_t {
   uint64_t remove_item(btree_node_t *node, btree_node_t *parent, uint64_t key,
                        size_t pos);
 
-  uint64_t remove(bip::managed_mapped_file *res, uint64_t key);
+  uint64_t remove(mmf *res, uint64_t key);
 
 #define NODE_CONTAINS_ITEM(_n, _i, _k) \
   ((_i) != (_n)->count && (_n)->items[_i].key == (_k))

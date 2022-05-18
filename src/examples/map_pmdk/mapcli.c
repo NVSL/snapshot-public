@@ -227,6 +227,8 @@ main(int argc, char *argv[])
 				break;
 		        } 
 		        case 'R': {
+				double elapsed_s = 0;
+				uint64_t elapsed_ns = 0;
 				uint64_t *keys = (uint64_t*)malloc(BULK_INSERT_CNT*sizeof(uint64_t));
 				for (int i = 0; i < BULK_INSERT_CNT; i++) {
 					keys[i] = rand();
@@ -240,12 +242,14 @@ main(int argc, char *argv[])
 				}
 				assert(TIME_UTC == timespec_get(&ts_end, TIME_UTC));
 
-				const uint64_t elapsed_ns
-					= (ts_end.tv_sec - ts_start.tv_sec)*1000*1000*1000
+				elapsed_ns
+					+= (ts_end.tv_sec - ts_start.tv_sec)*1000*1000*1000
 					+ (ts_end.tv_nsec - ts_start.tv_nsec);
-				const double elapsed_s = elapsed_ns / (double)(1000*1000*1000);
-				const double insertion_per_s = (BULK_INSERT_CNT) / elapsed_s;
+				elapsed_s += elapsed_ns / (double)(1000*1000*1000);
 
+				free(keys);
+
+				const double insertion_per_s = (BULK_INSERT_CNT) / elapsed_s;
 				printf("Elapsed ns = %lu\n", elapsed_ns);
 				printf("Elapsed s = %lf\n", elapsed_s);
 				printf("Rate = %lf\n", insertion_per_s);

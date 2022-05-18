@@ -39,6 +39,7 @@ To run tests:
 | PMEM_END_ADDR         | addr            | Marks the end of the tracking region                                                       |
 | CXLBUF_MSYNC_IS_NOP   | {1,0,-}         | Disables persistency of msync and converts it into a NOP                                   |
 | CXLBUF_MSYNC_SLEEP_NS | {val,-}         | Add a fixed sleep to msync to simulate crash consistency behavior                          |
+| CXLBUF_USE_HUGEPAGE   | {1,0,-}         | Use huge pages for page cache mapping                                                      |
 
 **** Debugging
 | Environment variable | Possible values        | Comments                                                                           |

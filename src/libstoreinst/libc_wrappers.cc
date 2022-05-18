@@ -12,6 +12,7 @@
 #include "recovery.hh"
 #include "utils.hh"
 
+#include <bit>
 #include <cassert>
 #include <dlfcn.h>
 #include <filesystem>
@@ -345,14 +346,35 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
         /* Streaming write is only allowed if the write size is a power of two
            (popcount == 1) and dest address is aligned at entry.bytes */
-        const bool str_wr_allowed =
-            (std::popcount(entry.bytes) == 1) and (dst_addr % entry.bytes == 0);
-
-        DBGH(4) << "Streaming write allowed? " << str_wr_allowed << "\n";
+        const bool str_wr_allowed = true;
 
         if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
-          pmemops->streaming_wr((void *)dst_addr, (void *)(0UL + entry.addr),
-                                entry.bytes);
+          size_t dst_addr_aligned = dst_addr;
+
+          auto previousPowerOfTwo = [](size_t x) -> size_t {
+            return ((sizeof(x) * 8 - 1) - __builtin_clzl(x));
+          };
+
+          size_t prev_pwr_2 = previousPowerOfTwo(entry.bytes) + 1;
+          size_t align_to = prev_pwr_2 > 9 ? 9 : prev_pwr_2;
+          align_to =
+              (std::popcount(entry.bytes) == 1) ? align_to - 1 : align_to;
+
+          dst_addr_aligned >>= align_to;
+          dst_addr_aligned <<= align_to;
+
+          size_t modulo = dst_addr & ((1 << align_to) - 1);
+
+          dst_addr_aligned = (modulo == 0) ? dst_addr : dst_addr_aligned;
+
+          size_t new_sz = entry.bytes + (dst_addr - dst_addr_aligned);
+
+          DBGH(4) << "Aligned " << (void *)dst_addr << " to "
+                  << (void *)dst_addr_aligned << " with new size = " << new_sz
+                  << "\n";
+
+          pmemops->streaming_wr((void *)dst_addr_aligned,
+                                (void *)(0UL + entry.addr), new_sz);
         } else {
           real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
                       entry.bytes);
@@ -381,8 +403,8 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
     }
 #endif // CXLBUF_TESTING_GOODIES
 
-    /* Update the state to drop the log and drain all the updates to the backing
-       file */
+    /* Update the state to drop the log and drain all the updates to the
+       backing file */
     pmemops->drain();
     tls_log.set_state(cxlbuf::Log::State::EMPTY);
   } else {
@@ -408,21 +430,21 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   return 0;
 }
 
-int munmap(void *__addr, size_t __len) __THROW {
-  DBGH(4) << "mumap intercepted\n";
-  for (auto &range : cxlbuf::mapped_addr) {
-    if (__addr >= (void *)range.second.range.start &&
-        __addr < (void *)range.second.range.end) {
-      if (__addr != (void *)range.second.range.start) {
-        DBGE << "Unmapping part of address range not supported" << std::endl;
-        exit(1);
-      } else {
-        cxlbuf::mapped_addr.erase(cxlbuf::mapped_addr.find(range.first));
-        break;
+  int munmap(void *__addr, size_t __len) __THROW {
+    DBGH(4) << "mumap intercepted\n";
+    for (auto &range : cxlbuf::mapped_addr) {
+      if (__addr >= (void *)range.second.range.start &&
+          __addr < (void *)range.second.range.end) {
+        if (__addr != (void *)range.second.range.start) {
+          DBGE << "Unmapping part of address range not supported" << std::endl;
+          exit(1);
+        } else {
+          cxlbuf::mapped_addr.erase(cxlbuf::mapped_addr.find(range.first));
+          break;
+        }
       }
     }
-  }
 
-  return real_munmap(__addr, __len);
-}
+    return real_munmap(__addr, __len);
+  }
 }

@@ -10,61 +10,118 @@ MAP_CXLBUF="map/map"
 PMDK_POOL="/mnt/pmem0/map"
 SCALE=4
 
-OPS=100000
+OPS=400000
 
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
 export CXL_MODE_ENABLED=0
-
+export CXLBUF_USE_HUGEPAGE=1
 set -e
 # set -x
 
-execute() {
-    printf "insert,"
-    
+clear() {
     rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
+    rm -rf "${LOG_LOC}"    
+}
 
+using_perf() {
+    name=$1
+    sudo -E perf stat -o "/tmp/perf.$name" -d -d -d -e 'L1-dcache-load-misses,L1-dcache-loads,L1-dcache-stores,L1-icache-load-misses,LLC-load-misses,LLC-loads,LLC-store-misses,LLC-stores' "${@:2}"
+}
+
+LOG_F=/tmp/output.log
+
+execute_insert() {
+    printf "insert,"
+
+    # PMDK
+    clear
     echo 'k\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+        | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
         | tr -d '\n'
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
-
-    val=$(CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i 400000 2>&1 \
+    # Snapshot
+    clear
+    val=$(CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+        | tee "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
         | tr -d '\n')
 
-    printf ",$(bc <<< "scale=$SCALE; $val/1000000000")\ndelete,"
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
 
+    # msync - no huge pages
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
 
+    # msync - huge pages
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
+
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
+}
+
+execute_delete() {
+        printf "\ndelete,"
+
+    # PMDK
+    clear
     echo 'R\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+        | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
         | tr -d '\n'
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
+    # Snapshot
+    clear
+    val=$(CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
 
-    val=$("${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r 400000 2>&1 \
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+
+    # msync - no huge page
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+        | tee -a "$LOG_F" \
         | grep 'Total ns: ' \
         | sed 's/Total ns: //g' \
         | tr -d '\n')
 
-    printf "$(bc <<< "scale=$SCALE; $val/1000000000")\nread,"
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
 
+    # msync - huge page
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns: ' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000")\n"
+}
 
+execute_traverse() {
+    printf "read,"
+
+    # PMDK
+    clear
     echo 'C\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
@@ -72,20 +129,55 @@ execute() {
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${LOG_LOC}"
-
-    val=$("${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c 400000 2>&1 \
+    # Snapshot
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
               | grep 'Total ns' \
               | sed 's/Total ns: //g'\
               | tr -d '\n')
-    
 
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+
+    # msync - no huge page
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
+              | grep 'Total ns' \
+              | sed 's/Total ns: //g'\
+              | tr -d '\n')
+
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+
+    # msync - use huge page
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
+              | grep 'Total ns' \
+              | sed 's/Total ns: //g'\
+              | tr -d '\n')
 
     printf "$(bc <<< "scale=$SCALE; $val/1000000000")\n"
 }
 
-printf "operation,pmdk,snapshot\n"
+execute() {
+    ####################
+    ######## INSERT
+    ####################
+
+    execute_insert
+
+    ####################
+    ######## DELETE
+    ####################
+
+    execute_delete
+
+    ####################
+    ######## TRAVERSE
+    ####################
+
+    execute_traverse
+}
+
+printf "operation,pmdk,snapshot,msync,msync huge pages\n"
 execute
 
 
