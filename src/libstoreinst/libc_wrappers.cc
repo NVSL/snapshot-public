@@ -282,6 +282,11 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
      backing file */
   tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
 
+  if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
+    DBGE << "MS_FORCE_SNAPSHOT called with no sign of instrumentation\n";
+    exit(1);
+  }
+
   DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
           << ")\n";
   if (storeInstEnabled) [[likely]] {

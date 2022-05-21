@@ -19,10 +19,6 @@ using namespace nvsl;
 
 int main(int argc, char *argv[]) {
   const std::map<std::string, std::function<void(void)>> msb = {
-      std::make_pair("clwbvsntstore",
-                     std::function<void(void)>(mb_clwbvsntstore)),
-      std::make_pair("clwbsfencedist",
-                     std::function<void(void)>(mb_clwbsfencedist)),
       std::make_pair("msyncscaling",
                      std::function<void(void)>(mb_msyncscaling)),
   };

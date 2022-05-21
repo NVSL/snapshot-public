@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #define BUF_SIZE (100 * 1000 * 4096UL)
+#define MS_FORCE_SNAPSHOT 32
 
 namespace nvsl {
   class PMemOps;
@@ -21,7 +22,7 @@ namespace nvsl {
   namespace cxlbuf {
     extern std::string *log_loc;
     extern void *backing_file_start;
-  }
+  } // namespace cxlbuf
 } // namespace nvsl
 
 extern "C" {

@@ -48,6 +48,7 @@ libvramfs:
 
 clean: libpmbuffer_clean libdsaemu_clean examples_clean storeinst-pass_clean \
 	scripts_clean libstoreinst_clean libpmdkemul_clean
+	rm "$(SELF_DIR).make.tmp"
 
 %_clean:
 	$(PUDDLES_MAKE) -C $(subst _clean,,$@) clean

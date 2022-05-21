@@ -1,4 +1,4 @@
-.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks redirect
+.PHONY: simplekv_cxlbuf simplekv_pmdk btree map map_pmdk linkedlist_tx single_write microbenchmarks redirect  microbenchmarks_cxlbuf
 SOURCES := $(wildcard *.cc)
 OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 INCLUDE :=-I../include
@@ -10,7 +10,7 @@ EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
 SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk linkedlist_pmdk linkedlist_tx \
-	microbenchmarks gpu-microbenchmarks
+	microbenchmarks gpu-microbenchmarks microbenchmarks_cxlbuf
 
 include ../common.make
 
