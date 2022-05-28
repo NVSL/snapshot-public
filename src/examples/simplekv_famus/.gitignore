@@ -1,0 +1,6 @@
+memtrace.out.*
+simplekv_famus
+*.inst
+*.bc
+.deps/*
+.clang-format
