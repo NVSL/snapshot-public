@@ -164,7 +164,7 @@ class Fig(object):
 
         return self
 
-    def fmt_legend(self, **kwargs):
+    def fmt_legend(self, y_off_scale=1, **kwargs):
         kwargs = dict(kwargs)
         if 'loc' not in kwargs:
             kwargs['loc'] = 'upper center'
@@ -175,7 +175,7 @@ class Fig(object):
         bbox_to_anchor = (0, 0)
 
         if kwargs['loc'] == 'upper center':
-            bbox_to_anchor = (0.5, 1.45)
+            bbox_to_anchor = (0.5, 1.45 * y_off_scale)
 
         handles, labels = self.ax.get_legend_handles_labels()
         
@@ -223,9 +223,13 @@ class Fig(object):
 
         return self
 
-    def fmt_label(self, xlabel, ylabel):
-        self.ax.set_xlabel(xlabel, fontsize=Fig.fontsize_gbl, fontweight='bold')
-        self.ax.set_ylabel(ylabel, fontsize=Fig.fontsize_gbl, fontweight='bold')
+    def fmt_label(self, xlabel, ylabel, **kwargs):
+        fontsize=Fig.fontsize_gbl
+        if 'fontsize' in kwargs:
+            fontsize=kwargs['fontsize']
+            del kwargs['fontsize']
+        self.ax.set_xlabel(xlabel, fontsize=fontsize, fontweight='bold', **kwargs)
+        self.ax.set_ylabel(ylabel, fontsize=fontsize, fontweight='bold', **kwargs)
 
         return self
 
@@ -240,7 +244,8 @@ class Fig(object):
 
         # Check if the input mask array can be used to generate the full mask
         if len(rects)%len(mask) != 0:
-            raise Exception("Bars in the axis must be a multiple of mask length")
+            raise Exception("Bars in the axis must be a multiple of mask length. "
+                           + f"Total rectangles = {len(rects)}")
 
         # Generate the full mask from the input mask
         if len(mask) != len(rects):
@@ -292,10 +297,12 @@ class Fig(object):
 def rename_index(df, map):
     return df.index.map(map)
 
-def rename_cols(df, map):
-    df.rename(columns=lambda x: map[x], inplace=True)
-    
-    return df
+def rename_cols(df, map, inplace=True):
+    for col in df.columns:
+        if str(col) not in map:
+            map[str(col)] = str(col)
+            
+    return df.rename(columns=lambda x: map[x], inplace=inplace)
 
 def capitalize_index(df):
     df.index = df.index.map(lambda x: x.capitalize())

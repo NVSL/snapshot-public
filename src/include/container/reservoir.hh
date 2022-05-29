@@ -15,8 +15,12 @@
 #include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/mutex_family.hpp>
+
+#include "nvsl/error.hh"
+
 #include <cassert>
 #include <iostream>
+#include <sys/mman.h>
 #include <unistd.h>
 
 namespace bip = boost::interprocess;
@@ -30,32 +34,42 @@ namespace libpuddles {
   class reservoir_t {
   private:
     mmf *ator;
+    int fd;
+
   public:
     reservoir_t(const std::string &fname, const size_t bytes) {
       ator = new mmf(bip::open_or_create, fname.c_str(), bytes);
+      fd = open(fname.c_str(), O_RDWR);
     }
 
     template <typename T>
-    T* allocate_root() {
-      return (T*)ator->construct<T>("root")();
+    T *allocate_root() {
+      return (T *)ator->construct<T>("root")();
     }
 
     template <typename T>
-    T* get_root() {
-      return (T*)ator->find<T>("root").first;
+    T *get_root() {
+      return (T *)ator->find<T>("root").first;
     }
-    
+
     template <typename T>
     T *malloc(const size_t count = 1) {
-      return (T*)ator->allocate(sizeof(T)*count);
+      return (T *)ator->allocate(sizeof(T) * count);
     };
 
-    void free(void *ptr) {
-      ator->deallocate(ptr);
-    }
+    void free(void *ptr) { ator->deallocate(ptr); }
 
-    void sync() {
-      msync(ator->get_address(), ator->get_size(), MS_SYNC);
+    int get_fd() const { return fd; }
+
+    void sync() { msync(ator->get_address(), ator->get_size(), MS_SYNC); }
+
+    void madvise_4k_page() {
+      int ret = madvise(ator->get_address(), ator->get_size(), MADV_NOHUGEPAGE);
+      if (ret == -1) {
+        DBGE << "Unable to set 4k page for the allocator\n";
+        DBGE << PSTR() << "\n";
+        exit(1);
+      }
     }
   };
-}
+} // namespace libpuddles

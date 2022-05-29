@@ -51,6 +51,9 @@ def main(fname):
                       '-fpass-plugin=' + PASS_SO,
                       '-ldl',
                       '-Wno-unused-command-line-argument']
+    else:
+        pass_args += ['-ldl']
+        
     if 'DCLANG_DONT_LINK' not in os.environ:
         pass_args += ['-ldl',
                       '-lstoreinst']

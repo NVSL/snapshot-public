@@ -148,6 +148,11 @@ __attribute__((__constructor__(101))) void libstoreinst_ctor() {
 
 __attribute__((unused)) void checkMemory(void *ptr) {
   // std::cerr << "CheckMemory at " << ptr << std::endl;
+
+#ifdef NO_CHECK_MEMORY
+  return;
+#endif
+
   if (startTracking) {
     if (start_addr <= ptr and ptr < end_addr) {
       tls_log.log_range(ptr, 8);

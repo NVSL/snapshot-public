@@ -119,8 +119,6 @@ std::vector<std::pair<void *, int>> allocate_mem_regions() {
 void mb_msyncscaling(bool use_real_msync) {
   auto mem_regions = allocate_mem_regions();
 
-  std::cerr << "Setup complete\n";
-
   const thread_arg_t *ta = new thread_arg_t({.tid = 0,
                                              .fd = mem_regions[0].second,
                                              .mem_region = mem_regions[0].first,
@@ -131,5 +129,7 @@ void mb_msyncscaling(bool use_real_msync) {
   msync_thread((void *)ta);
   clk.tock();
 
-  std::cout << 0 << ", " << clk.ns() / (double)(MAX_LOOPS) << "\n";
+  double elapsed_us = clk.ns() / 1000.0;
+
+  std::cout << 0 << ", " << elapsed_us / (double)(MAX_LOOPS) << "\n";
 }

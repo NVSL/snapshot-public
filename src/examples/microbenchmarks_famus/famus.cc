@@ -43,8 +43,6 @@ int famus_snap_sync(int bfd) {
     const std::string bfname = nvsl::fd_to_fname(bfd);
     const std::string snapshot_file = bfname + ".snapshot";
 
-    std::cerr << "snapshot file = " << snapshot_file << "\n";
-
     snap_fd = open(snapshot_file.c_str(), O_CREAT | O_RDWR, 0666);
     if (snap_fd == -1) {
       DBGE << "Unable to open fd for the snapshot file " << snapshot_file

@@ -265,6 +265,10 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
     return 0;
   }
 
+#if defined(NO_PERSIST_OPS) || defined(NO_CHECK_MEMORY)
+  return 0;
+#endif
+
 #ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tick();
 #endif
@@ -349,10 +353,14 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
                 << (void *)(0UL + entry.addr) << " -> " << (void *)dst_addr
                 << std::endl;
 
+#ifdef CXLBUF_ALIGN_SNAPSHOT_WRITES
+        const bool str_wr_allowed = true;
+#else
         /* Streaming write is only allowed if the write size is a power of two
            (popcount == 1) and dest address is aligned at entry.bytes */
-        const bool str_wr_allowed = true;
-
+        const bool str_wr_allowed =
+            (std::popcount(entry.bytes) == 1) and (dst_addr % entry.bytes == 0);
+#endif // CXLBUF_ALIGN_SNAPSHOT_WRITES
         if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
           size_t dst_addr_aligned = dst_addr;
 
@@ -378,8 +386,17 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
                   << (void *)dst_addr_aligned << " with new size = " << new_sz
                   << "\n";
 
-          pmemops->streaming_wr((void *)dst_addr_aligned,
-                                (void *)(0UL + entry.addr), new_sz);
+#ifdef CXLBUF_ALIGN_SNAPSHOT_WRITES
+          const size_t dst_addr_arg = dst_addr_aligned;
+          const size_t src_addr_arg =
+              entry.addr - (dst_addr_aligned - dst_addr);
+#else
+          const size_t dst_addr_arg = dst_addr;
+          const size_t src_addr_arg = entry.addr;
+#endif
+
+          pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
+                                new_sz);
         } else {
           real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
                       entry.bytes);

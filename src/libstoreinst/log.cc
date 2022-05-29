@@ -35,6 +35,10 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
   auto cxlModeEnabled_reg = cxlModeEnabled;
   auto &log_entry = *RCast<log_entry_t *>(log_area->tail_ptr);
 
+#ifdef NO_PERSIST_OPS
+  return;
+#endif
+
 #ifndef NDEBUG
   NVSL_ASSERT(log_area != nullptr, "Logging called without a log area");
 #endif
