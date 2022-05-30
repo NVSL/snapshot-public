@@ -24,7 +24,7 @@ TRAN_SIZES="1 2 4 8 16 32 64 128"
 #TRAN_SIZES="1 2"
 
 for tr in $TRAN_SIZES; do
-    printf "%s" $(bc <<< "scale=2; 1/$tr")
+    printf "%s" $(bc <<< "scale=3; 1/$tr")
 
     for i in 1 2 3 4 5 6; do
         KYOTO_ROOT="${KYOTO_ROOT_PREFIX}" TRAN_RND="$tr" execute
