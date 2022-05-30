@@ -301,8 +301,14 @@ def rename_cols(df, map, inplace=True):
     for col in df.columns:
         if str(col) not in map:
             map[str(col)] = str(col)
-            
-    return df.rename(columns=lambda x: map[x], inplace=inplace)
+           
+    
+    df_result = df.rename(columns=lambda x: map[x], inplace=inplace)
+    
+    if inplace:
+        df_result = df
+        
+    return df_result
 
 def capitalize_index(df):
     df.index = df.index.map(lambda x: x.capitalize())
