@@ -178,7 +178,6 @@ __attribute__((destructor)) void libstoreinst_dtor() {
   std::cerr << nvsl::cxlbuf::logged_check_count->str() << "\n";
   std::cerr << nvsl::cxlbuf::tx_log_count_dist->str() << "\n";
 
-  std::cerr << "Msync time:" << std::endl;
   std::cerr << "perst_overhead = " << perst_overhead_clk->ns() << std::endl;
 }
 }

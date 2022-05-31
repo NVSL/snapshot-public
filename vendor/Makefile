@@ -1,7 +1,7 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 .PHONY: all
-all: redis_dir kyoto_dir
+all: kyoto_dir
 
 redis_deps:
 	$(PUDDLES_MAKE) -C redis/deps geohash-int hiredis jemalloc linenoise lua
@@ -16,10 +16,10 @@ redis.inst_deps:
 kyoto_deps kyoto.inst_deps:
 
 %_normal: %_deps
-	$(PUDDLES_MAKE) -C $(patsubst %_normal,%,$@) USE_PMDK=yes STD=-std=gnu99
+	$(PUDDLES_MAKE) -C $(patsubst %_normal,%,$@) DISABLE_PASS=1 DCLANG_DONT_LINK=1 CC=$(ROOT_DIR)/bin/dclang CXX=$(ROOT_DIR)/bin/dclang++ USE_PMDK=yes STD=-std=gnu99
 
 %_inst: %.inst_deps
-	$(PUDDLES_MAKE) -C $(patsubst %_inst,%.inst,$@) CC=$(ROOT_DIR)/bin/dclang CXX=$(ROOT_DIR)/bin/dclang++ USE_PMDK=yes STD=-std=gnu99
+	$(PUDDLES_MAKE) -C $(patsubst %_inst,%.inst,$@) USE_PMDK=yes STD=-std=gnu99 CC=$(ROOT_DIR)/bin/dclang CXX=$(ROOT_DIR)/bin/dclang++
 
 .PHONY: clean
 

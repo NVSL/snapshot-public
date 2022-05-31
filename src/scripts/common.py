@@ -164,7 +164,7 @@ class Fig(object):
 
         return self
 
-    def fmt_legend(self, y_off_scale=1, **kwargs):
+    def fmt_legend(self, y_off_scale=1, x_off_scale=1, **kwargs):
         kwargs = dict(kwargs)
         if 'loc' not in kwargs:
             kwargs['loc'] = 'upper center'
@@ -175,7 +175,7 @@ class Fig(object):
         bbox_to_anchor = (0, 0)
 
         if kwargs['loc'] == 'upper center':
-            bbox_to_anchor = (0.5, 1.45 * y_off_scale)
+            bbox_to_anchor = (0.5 * x_off_scale, 1.45 * y_off_scale)
 
         handles, labels = self.ax.get_legend_handles_labels()
         

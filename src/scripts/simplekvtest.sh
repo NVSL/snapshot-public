@@ -3,9 +3,11 @@
 SIMPLEKV_ROOT="/home/smahar/git/cxlbuf/src/examples/"
 CONFIG_FILE="${SIMPLEKV_ROOT}/../../make.config"
 SIMPLEKV_CXLBUF="simplekv_cxlbuf/simplekv_puddles"
+SIMPLEKV_FAMUS="simplekv_famus/simplekv_famus"
 SIMPLEKV_PMDK="simplekv_pmdk/simplekv_pmdk"
 YCSB_LOC="/home/smahar/git/libpuddles-scripts/traces/"
 PMDK_POOL="/mnt/pmem0/simplekv"
+FAMUS_POOL="/mnt/pmem0p2/simplekv"
 
 YCSB_WRKLD="a b c d e f g"
 # YCSB_WRKLD="a c g"
@@ -41,6 +43,12 @@ remake() {
         sed -i 's|LOG_FORMAT_NON_VOLATILE=y|LOG_FORMAT_NON_VOLATILE=n|g' "$CONFIG_FILE"
     fi
 
+    if [ "$2" = "align" ]; then
+        sed -i 's|CXLBUF_ALIGN_SNAPSHOT_WRITES=n|CXLBUF_ALIGN_SNAPSHOT_WRITES=y|g' "$CONFIG_FILE"
+    else
+        sed -i 's|CXLBUF_ALIGN_SNAPSHOT_WRITES=y|CXLBUF_ALIGN_SNAPSHOT_WRITES=n|g' "$CONFIG_FILE"
+    fi
+
     if [ "$V" = "1" ]; then 
         recompile
     else
@@ -58,6 +66,7 @@ execute() {
     "${SIMPLEKV_ROOT}/${SIMPLEKV_PMDK}" "${PMDK_POOL}" ycsb \
                                         "${YCSB_LOC}${wrkld}-load-1.0" \
                                         "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+        | tee /tmp/run.log \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
@@ -90,25 +99,43 @@ execute() {
                        "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
-    printf ","
-
     rm -f "${PMDK_POOL}"*
     rm -f "${LOG_LOC}"
 
     printf "\n"
 }
 
-remake volatile
-printf "pmdk,snashot,msync,msync huge page\n"
+execute_snapshot() {
+    rm -f "${PMDK_POOL}"*
+    rm -f "${LOG_LOC}"
+
+    CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=1 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
+                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+        | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
+
+
+    printf "\n"
+}
+
+
+remake volatile align
+printf "pmdk,snashot,msync,msync huge page,famus snap\n"
 for wrkld in $YCSB_WRKLD; do
     execute
 done
 
 
-remake nonvolatile
-printf "pmdk,snashot,msync,msync huge page\n"
+remake nonvolatile align
+printf "pmdk,snashot,msync,msync huge page,famus snap\n"
 for wrkld in $YCSB_WRKLD; do
     execute
+done
+
+remake volatile noalign
+printf "snashot-unaligned\n"
+for wrkld in $YCSB_WRKLD; do
+    execute_snapshot
 done
 
 

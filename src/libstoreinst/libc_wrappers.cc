@@ -150,8 +150,14 @@ void *memmove(void *__restrict dst, const void *__restrict src,
 }
 
 void *memset(void *s, int c, size_t n) {
-//  fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
-//          n / 1024);
+  //fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
+  //        n / 1024);
+
+  if (addr_in_range(s) || addr_in_range((char *)s + n)) {
+    DBGE << "memset for persistent range not implemented\n";
+    exit(1);
+  }
+
   return real_memset(s, c, n);
 }
 
