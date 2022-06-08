@@ -150,12 +150,13 @@ void *memmove(void *__restrict dst, const void *__restrict src,
 }
 
 void *memset(void *s, int c, size_t n) {
-  //fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
-  //        n / 1024);
+  // fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
+  //         n / 1024);
 
   if (addr_in_range(s) || addr_in_range((char *)s + n)) {
-    DBGE << "memset for persistent range not implemented\n";
-    exit(1);
+    if (startTracking) {
+      tls_log.log_range(s, n);
+    }
   }
 
   return real_memset(s, c, n);
@@ -172,8 +173,11 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
           << mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
           << std::endl;
 
+  std::cerr << "cxlModeEnabled = " << cxlModeEnabled << "\n";
+
   // Check if the mmaped file is in /mnt/pmem0/
-  if (is_prefix("/mnt/pmem0/", fd_fname) or is_prefix("/mnt/cxl0", fd_fname)) {
+  if (cxlModeEnabled and (is_prefix("/mnt/pmem0/", fd_fname) or
+                          is_prefix("/mnt/cxl0", fd_fname))) {
     if (cxlbuf::mmap_start == nullptr) {
       cxlbuf::mmap_start = start_addr;
     }
@@ -191,6 +195,7 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
     pmemf.map_backing_file();
   }
 
+  std::cerr << "Mapping to page cache\n";
   void *result = pmemf.map_to_page_cache(__flags, __prot, __fd, __offset);
 
   return result;

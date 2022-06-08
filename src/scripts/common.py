@@ -233,7 +233,7 @@ class Fig(object):
 
         return self
 
-    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white', label_move_thresh=0.005, label_off_frac=0.1):
+    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white', label_move_thresh=0.005, label_off_frac=0.1, rotation=0, ha='center', va='bottom'):
         rects = self.ax.patches
         mask_full = mask
         
@@ -275,10 +275,17 @@ class Fig(object):
                     label_pos = ylim[1] + label_off
                 
             label = round(height, precision)
+            
+            if rotation != 0:
+                text_x_off = rect.get_width()/4
+            
             tx = self.ax.text(
-                rect.get_x() + rect.get_width() / 2, label_pos, f"{label}x", ha="center", va="bottom",
+                rect.get_x() + rect.get_width() / 2, label_pos, f"{label}x",
                 fontsize=label_fontsize,
-                bbox=dict(facecolor=facecolor, alpha=alpha, edgecolor=edgecolor)
+                bbox=dict(facecolor=facecolor, alpha=alpha, edgecolor=edgecolor),
+                ha=ha,
+                va=va,
+                rotation=rotation
             )
 
         return self

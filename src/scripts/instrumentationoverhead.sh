@@ -92,10 +92,11 @@ run() {
 
 }
 
-printf "workload,baseline,no persist ops,no check memory,no instrumentation\n"
-for wrkld in $YCSB_WRKLD; do
-    printf "${wrkld},"
-    run
+for i in 1 2 3 4 5; do
+    printf "workload,baseline,no persist ops,no check memory,no instrumentation\n"
+    for wrkld in $YCSB_WRKLD; do
+        printf "${wrkld},"
+        run
+    done
 done
-
 

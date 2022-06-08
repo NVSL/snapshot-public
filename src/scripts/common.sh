@@ -20,6 +20,10 @@ backtrace() {
         printf "\t%2d: " "$((i-1))"
         echo "$func(), $src, line $line"
     done
+
+    if [ ! -z "$LOG_F" ]; then
+        printf "\n=== Log written to $LOG_F ===\n\n"
+    fi
 }
 
 function trace_top_caller() {

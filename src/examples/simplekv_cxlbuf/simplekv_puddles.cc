@@ -138,7 +138,9 @@ int main(int argc, char *argv[]) {
 
       /* Execute the run trace */
       std::cout << "Executing run trace" << std::endl;
+#ifndef DISABLE_CXLBUF
       startTracking = true;
+#endif
       root->put("a", 0, true);
       msync(root, 1024, MS_SYNC);
 

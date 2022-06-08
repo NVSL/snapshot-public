@@ -222,20 +222,22 @@ void bulk_delete_nodes(mmf *res, linkedlist_t *ll_obj,
   std::cout << clk.summarize(cnt) << std::endl;
 }
 
-size_t sum_nodes(const linkedlist_t *ll_obj) {
-  node_t *cur_node = ll_obj->head;
+size_t sum_nodes(const linkedlist_t *ll_obj, bool print = true) {
   size_t result = 0;
   Clock clk;
 
   clk.tick();
-  while (cur_node != nullptr) {
-    result += cur_node->data;
-    cur_node = cur_node->next;
+  for (int i = 0; i < 100; i++) {
+    node_t *cur_node = ll_obj->head;
+    while (cur_node != nullptr) {
+      result += cur_node->data;
+      cur_node = cur_node->next;
+    }
   }
   clk.tock();
   clk.reconcile();
 
-  std::cout << clk.summarize() << std::endl;
+  if (print) std::cout << clk.summarize() << std::endl;
 
   return result;
 }
@@ -303,6 +305,9 @@ int main(int argc, char *argv[]) {
       count_nodes(root_ptr);
       break;
     case 's':
+      /* Prevent weird cache behavior */
+      sum_nodes(root_ptr, false);
+
       std::cout << sum_nodes(root_ptr) << std::endl;
       break;
     case 'g':

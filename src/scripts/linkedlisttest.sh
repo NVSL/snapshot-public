@@ -13,6 +13,10 @@ if [ -z "${1-}" ]; then
     exit 1
 fi
 
+FS_POOL="/mnt/pmem0p2/linkedlist"
+FS_DJ_POOL="/mnt/pmem0p2/map"
+
+
 if [ "$1" = "GPU" ]; then
     PMDK_POOL="/mnt/cxl0/linkedlist"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
@@ -36,6 +40,13 @@ check_bin "${LL_ROOT}/${LL_PMDK}" "-O3"
 check_bin "${LL_ROOT}/${LL_CXLBUF}" "-O3"
 check_bin "${LL_ROOT}/${LL_CXLBUF}" "-D RELEASE"
 
+clean() {
+    rm -f "${PMDK_POOL}"*
+    rm -f "${FS_POOL}"*
+    rm -f "${FS_DJ_POOL}"*
+    rm -rf "${CXLBUF_LOG_LOC}"
+}
+
 execute() {
     OP="$1"    # Operation to perform
     OCCUR="$2" # Only use the n'th occurrence
@@ -43,39 +54,38 @@ execute() {
 
     printf "${NAME},"
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${CXLBUF_LOG_LOC}"
-
-    #pmempool create obj --layout=linkedlist -s 256M "${PMDK_POOL}"
-
+    clean
     pmdk=$(printf "$OP" | LD_PRELOAD="${LD_PRELOAD}" "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${pmdk},"
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${CXLBUF_LOG_LOC}"
+    clean
     cxlbuf=$(printf "$OP" | CXLBUF_LOG_LOC="${CXLBUF_LOG_LOC}" CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${cxlbuf},"
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${CXLBUF_LOG_LOC}"
-    printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
+    clean
+    printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -rf "${CXLBUF_LOG_LOC}"
-    printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
+    clean
+    printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
+        | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
+
+    printf ","
+
+    clean
+    printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${FS_DJ_POOL}" 2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf "\n"
 }
 
-printf "workload,pmdk,snashot,msync,msync huge page\n"
+printf "workload,pmdk,snashot,msync,msync huge page,msync data journal\n"
 execute "A $OPS" 1 "insert"
 execute "A $OPS\nR $OPS" 2 "delete"
 execute 'A '$OPS'\ns' 2 "traverse"

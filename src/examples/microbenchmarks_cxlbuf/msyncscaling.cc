@@ -20,16 +20,17 @@
 
 using namespace nvsl;
 
-constexpr size_t MAX_LOOPS = 10000;
-constexpr size_t MAX_UPDATES = 2;
-constexpr size_t MAX_THREADS = 40;
-constexpr size_t MMAP_SIZE = 1024UL * 1024 * 256;
+constexpr size_t MAX_LOOPS = 500000;
+constexpr size_t MAX_UPDATES = 3;
+constexpr size_t MAX_THREADS = 20;
+constexpr size_t MMAP_SIZE = 1024UL * 1024 * 1024;
 
 extern bool startTracking;
 
 struct thread_arg_t {
   size_t tid;
   void *mem_region;
+  size_t total_threads;
 };
 
 extern bool cxlModeEnabled;
@@ -46,7 +47,7 @@ void *msync_thread(void *vargp) {
   char *cacheline = (char *)malloc(malloc_sz);
   memset(cacheline, rand(), malloc_sz);
 
-  for (size_t loop = 0; loop < MAX_LOOPS; loop++) {
+  for (size_t loop = 0; loop < MAX_LOOPS / ta->total_threads; loop++) {
     for (size_t i = 0; i < MAX_UPDATES; i++) {
       auto dst = &arr[((rand() % MMAP_SIZE) >> 9) << 9];
       auto src = cacheline;
@@ -106,8 +107,8 @@ void mb_msyncscaling() {
 
   startTracking = 1;
 
-  const thread_arg_t *ta =
-      new thread_arg_t({.tid = 0, .mem_region = mem_regions[0]});
+  const thread_arg_t *ta = new thread_arg_t(
+      {.tid = 0, .mem_region = mem_regions[0], .total_threads = 1});
 
   msync_thread((void *)ta);
 
@@ -119,8 +120,9 @@ void mb_msyncscaling() {
     for (size_t tid = 0; tid < tcount; tid++) {
       tids.push_back(0);
 
-      const thread_arg_t *ta =
-          new thread_arg_t({.tid = tid, .mem_region = mem_regions[tid]});
+      const thread_arg_t *ta = new thread_arg_t({.tid = tid,
+                                                 .mem_region = mem_regions[tid],
+                                                 .total_threads = tcount});
 
       pthread_create(&tids[tid], NULL, msync_thread, (void *)ta);
     }

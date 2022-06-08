@@ -14,8 +14,21 @@ set -e
 
 LOG_F=/tmp/output.log
 
-CXLBUF_USE_HUGEPAGE=1 "${EX_ROOT}/microbenchmarks/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling_hugepage.csv"
-CXLBUF_USE_HUGEPAGE=0 "${EX_ROOT}/microbenchmarks/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling.csv"
-"${EX_ROOT}/microbenchmarks_cxlbuf/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling_cxlbuf.csv"
+FS_DJ_POOL="/mnt/pmem0p2/simplekv"
+FS_POOL="/mnt/pmem0p3/simplekv"
+
+clean() {
+    rm -f "$FS_DJ_POOL"*
+    rm -f "$FS_POOL"*
+}
+
+clean
+BENCHMARK_FILE="${FS_POOL}" CXLBUF_USE_HUGEPAGE=1 "${EX_ROOT}/microbenchmarks/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling_hugepage.csv"
+clean
+BENCHMARK_FILE="${FS_POOL}" CXLBUF_USE_HUGEPAGE=0 "${EX_ROOT}/microbenchmarks/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling.csv"
+clean
+BENCHMARK_FILE="${FS_DJ_POOL}" CXLBUF_USE_HUGEPAGE=0 "${EX_ROOT}/microbenchmarks/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling_dj.csv"
+clean
+BENCHMARK_FILE="${FS_POOL}" "${EX_ROOT}/microbenchmarks_cxlbuf/run" --run=msyncscaling | tee "${EX_ROOT}/../../data/msyncscaling_cxlbuf.csv"
 
 

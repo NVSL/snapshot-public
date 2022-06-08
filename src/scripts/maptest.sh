@@ -8,6 +8,8 @@ MAP_ROOT="/home/smahar/git/cxlbuf/src/examples/"
 MAP_PMDK="map_pmdk/mapcli"
 MAP_CXLBUF="map/map"
 PMDK_POOL="/mnt/pmem0/map"
+FS_DJ_POOL="/mnt/pmem0p2/map"
+FS_POOL="/mnt/pmem0p3/map"
 SCALE=4
 
 OPS=400000
@@ -21,6 +23,8 @@ set -e
 
 clear() {
     rm -f "${PMDK_POOL}"*
+    rm -f "${FS_POOL}"*
+    rm -f "${FS_DJ_POOL}"*
     rm -rf "${LOG_LOC}"    
 }
 
@@ -71,6 +75,16 @@ execute_insert() {
         | tr -d '\n')
 
     printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
+
+    # msync - data journal
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_DJ_POOL}" btree bulk i $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
+
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
 }
 
 execute_delete() {
@@ -109,6 +123,16 @@ execute_delete() {
     # msync - huge page
     clear
     val=$(CXLBUF_USE_HUGEPAGE=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+        | tee -a "$LOG_F" \
+        | grep 'Total ns: ' \
+        | sed 's/Total ns: //g' \
+        | tr -d '\n')
+
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+
+    # msync - data journal
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk r $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns: ' \
         | sed 's/Total ns: //g' \
@@ -154,6 +178,15 @@ execute_traverse() {
               | sed 's/Total ns: //g'\
               | tr -d '\n')
 
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+
+    # msync data journal
+    clear
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk c $OPS 2>&1 \
+              | grep 'Total ns' \
+              | sed 's/Total ns: //g'\
+              | tr -d '\n')
+
     printf "$(bc <<< "scale=$SCALE; $val/1000000000")\n"
 }
 
@@ -177,7 +210,7 @@ execute() {
     execute_traverse
 }
 
-printf "operation,pmdk,snapshot,msync,msync huge pages\n"
+printf "operation,pmdk,snapshot,msync,msync huge pages,msync data journal\n"
 execute
 
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 SIMPLEKV_ROOT="/home/smahar/git/cxlbuf/src/examples/"
-CONFIG_FILE="${SIMPLEKV_ROOT}/../../make.config"
+CONFIG_FILE="${SIMPLEKV_ROOT}../../make.config"
 SIMPLEKV_CXLBUF="simplekv_cxlbuf/simplekv_puddles"
 SIMPLEKV_FAMUS="simplekv_famus/simplekv_famus"
 SIMPLEKV_PMDK="simplekv_pmdk/simplekv_pmdk"
 YCSB_LOC="/home/smahar/git/libpuddles-scripts/traces/"
 PMDK_POOL="/mnt/pmem0/simplekv"
+FS_DJ_POOL="/mnt/pmem0p2/simplekv"
+FS_POOL="/mnt/pmem0p3/simplekv"
 FAMUS_POOL="/mnt/pmem0p2/simplekv"
 
 YCSB_WRKLD="a b c d e f g"
@@ -52,14 +54,20 @@ remake() {
     if [ "$V" = "1" ]; then 
         recompile
     else
-        echo "Recompiling $(dirname "$CONFIG_FILE") ..." >&2
+        echo "Recompiling $(dirname "$CONFIG_FILE")" >&2
         recompile >/dev/null 2>&1
     fi
 }
 
-execute() {
+clean() {
     rm -f "${PMDK_POOL}"*
+    rm -f "${FS_POOL}"*
+    rm -f "${FS_DJ_POOL}"*
     rm -f "${LOG_LOC}"
+}
+
+execute() {
+    clean
 
     pmempool create obj --layout=simplekv -s 1G "${PMDK_POOL}"
     
@@ -71,8 +79,7 @@ execute() {
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -f "${LOG_LOC}"
+    clean
 
     CXL_MODE_ENABLED=1 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
                        ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
@@ -81,26 +88,31 @@ execute() {
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -f "${LOG_LOC}"
+    clean
 
-    CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+    CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${FS_POOL}" \
                        ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
                        "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
 
-    rm -f "${PMDK_POOL}"*
-    rm -f "${LOG_LOC}"
+    clean
 
-    CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+    CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${FS_POOL}" \
                        ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
                        "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
-    rm -f "${PMDK_POOL}"*
-    rm -f "${LOG_LOC}"
+    printf ","
+    clean
+
+    CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}" "${FS_DJ_POOL}" \
+                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
+                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+        | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
+
+    clean
 
     printf "\n"
 }
@@ -120,14 +132,15 @@ execute_snapshot() {
 
 
 remake volatile align
-printf "pmdk,snashot,msync,msync huge page,famus snap\n"
+printf "pmdk,snashot,msync,msync huge page,msync data journal\n"
+set +x
 for wrkld in $YCSB_WRKLD; do
-    execute
+    execute;
 done
 
 
 remake nonvolatile align
-printf "pmdk,snashot,msync,msync huge page,famus snap\n"
+printf "pmdk,snashot,msync,msync huge page,msync data journal\n"
 for wrkld in $YCSB_WRKLD; do
     execute
 done

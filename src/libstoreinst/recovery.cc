@@ -383,14 +383,30 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
                                           off_t off) {
   /* Add map fixed no replace to prevent kernel from mapping it outside the
      tracking space and remove the MAP_SYNC flag */
+  flags &= ~MAP_SYNC;
+  flags &= ~MAP_SHARED;
+  flags &= ~MAP_SHARED_VALIDATE;
+
   if (this->addr != nullptr) {
     flags |= MAP_FIXED_NOREPLACE;
   }
-  flags &= ~MAP_SYNC;
 
-  DBGH(2) << "Calling real_mmap: "
-          << mmap_to_str(this->addr, this->len, prot, flags, fd, off)
-          << std::endl;
+  /* Only map privately if the cxl mode is enabled, that is, this file is on
+     PMEM */
+  if (cxlModeEnabled) {
+    const auto fpath = fd_to_fname(fd);
+    if (not fpath.empty() and not nvsl::is_prefix("/mnt/pmem0/", fpath)) {
+      DBGE << "Unable to map non pmem file to page cache\n";
+      exit(1);
+    }
+    flags |= MAP_PRIVATE;
+  } else {
+    flags |= MAP_SHARED;
+  }
+
+  std::cerr << "Calling real_mmap: "
+            << mmap_to_str(this->addr, this->len, prot, flags, fd, off)
+            << std::endl;
   void *result = real_mmap(this->addr, this->len, prot, flags, fd, off);
 
   if (result == MAP_FAILED) {
