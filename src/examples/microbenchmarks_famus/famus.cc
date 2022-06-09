@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <linux/fs.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -43,7 +44,7 @@ int famus_snap_sync(int bfd) {
     const std::string bfname = nvsl::fd_to_fname(bfd);
     const std::string snapshot_file = bfname + ".snapshot";
 
-    snap_fd = open(snapshot_file.c_str(), O_CREAT | O_RDWR, 0666);
+    snap_fd = open(snapshot_file.c_str(), O_CREAT | O_WRONLY, S_IWUSR);
     if (snap_fd == -1) {
       DBGE << "Unable to open fd for the snapshot file " << snapshot_file
            << "\n";
@@ -62,47 +63,20 @@ int famus_snap_sync(int bfd) {
 
   nvsl::Clock clk;
 
-  DISABLE_IF_RELEASE(clk.tick());
   fatal_if((0 != fstat(snap_fd, &sb)), __FILE__, __LINE__);
-  DISABLE_IF_RELEASE(clk.tock());
-  DISABLE_IF_RELEASE(std::cerr << "fstat took = " << clk.ns() / 1000.0
-                               << " us\n");
   // fatal_if((!rwperm(sb.st_mode, 0, 1)), __FILE__, __LINE__);
 
   clk.reset();
-  DISABLE_IF_RELEASE(clk.tick());
+  clk.tick();
   fatal_if((0 != ioctl(snap_fd, FICLONE, bfd)), __FILE__, __LINE__);
-  DISABLE_IF_RELEASE(clk.tock());
-  DISABLE_IF_RELEASE(std::cerr << "ioctl took = " << clk.ns() / 1000.0
-                               << " us\n");
+  clk.tock();
+  std::cout << clk.ns() << "\n";
 
-  clk.reset();
-  DISABLE_IF_RELEASE(clk.tick());
   fatal_if((0 != fsync(snap_fd)), __FILE__, __LINE__);
-  DISABLE_IF_RELEASE(clk.tock());
-  DISABLE_IF_RELEASE(std::cerr << "fsync took = " << clk.ns() / 1000.0
-                               << " us\n");
-
-  clk.reset();
-  DISABLE_IF_RELEASE(clk.tick());
   fatal_if((0 != fchmod(snap_fd, S_IRUSR)), __FILE__, __LINE__);
-  DISABLE_IF_RELEASE(clk.tock());
-  DISABLE_IF_RELEASE(std::cerr << "fchmod took = " << clk.ns() / 1000.0
-                               << " us\n");
-
-  clk.reset();
-  DISABLE_IF_RELEASE(clk.tick());
   fatal_if((0 != fstat(snap_fd, &sb)), __FILE__, __LINE__);
-  DISABLE_IF_RELEASE(clk.tock());
-  DISABLE_IF_RELEASE(std::cerr << "fstat took = " << clk.ns() / 1000.0
-                               << " us\n");
-
-  clk.reset();
-  DISABLE_IF_RELEASE(clk.tick());
   fatal_if((!rwperm(sb.st_mode, 1, 0)), __FILE__, __LINE__);
   fatal_if((0 != fsync(snap_fd)), __FILE__, __LINE__);
   fatal_if((0 != lseek(snap_fd, 0, SEEK_SET)), __FILE__, __LINE__);
-  // fatal_if((0 < dir_fd && 0 != fsync(dirfd)), __FILE__, __LINE__);
-  // fatal_if((0 != close(snap_fd)), __FILE__, __LINE__);
   return 0;
 }

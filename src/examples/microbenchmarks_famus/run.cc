@@ -21,8 +21,6 @@ int main(int argc, char *argv[]) {
   const std::map<std::string, std::function<void(bool)>> msb = {
       std::make_pair("msyncscaling",
                      std::function<void(bool)>(mb_msyncscaling)),
-      std::make_pair("msyncscaling",
-                     std::function<void(bool)>(mb_msyncscaling)),
   };
 
   for (int i = 1; i < argc; i++) {
@@ -33,7 +31,6 @@ int main(int argc, char *argv[]) {
 
       for (const auto &workload : workloads) {
         try {
-          msb.at(workload)(true);
           msb.at(workload)(false);
         } catch (const std::exception &e) {
           DBGE << "Workload `" << workload << "' not found.\n";

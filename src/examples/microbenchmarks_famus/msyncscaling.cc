@@ -63,7 +63,7 @@ std::vector<std::pair<void *, int>> allocate_mem_regions() {
   std::vector<std::pair<void *, int>> results;
 
   for (size_t tid = 0; tid < MAX_THREADS; tid++) {
-    std::string fname = "/mnt/pmem0p2/microbench." + S(tid);
+    std::string fname = "/mnt/pmem0p4/microbench." + S(tid);
     int fd = open(fname.c_str(), O_CREAT | O_RDWR, 0666);
     if (fd == -1) {
       DBGE << "Unable to open the microbenchmark file" << std::endl;
@@ -119,6 +119,11 @@ std::vector<std::pair<void *, int>> allocate_mem_regions() {
 void mb_msyncscaling(bool use_real_msync) {
   auto mem_regions = allocate_mem_regions();
 
+  if (use_real_msync == true) {
+    DBGE << "Real msync disabled\n";
+    exit(1);
+  }
+
   const thread_arg_t *ta = new thread_arg_t({.tid = 0,
                                              .fd = mem_regions[0].second,
                                              .mem_region = mem_regions[0].first,
@@ -131,5 +136,5 @@ void mb_msyncscaling(bool use_real_msync) {
 
   double elapsed_us = clk.ns() / 1000.0;
 
-  std::cout << 0 << ", " << elapsed_us / (double)(MAX_LOOPS) << "\n";
+  // std::cout << 0 << ", " << elapsed_us / (double)(MAX_LOOPS) << "\n";
 }
