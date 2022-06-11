@@ -1,7 +1,10 @@
+#include <dirent.h>
 #include <fcntl.h>
 #include <linux/fs.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+
+#include <filesystem>
 
 #include "nvsl/clock.hh"
 #include "nvsl/common.hh"
@@ -36,22 +39,11 @@ static inline int rwperm(mode_t m, unsigned int r, unsigned int w) {
  * "ioctl(FICLONE)" works only on reflink-enabled file systems, e.g., BtrFS,
  * XFS, OCFS2. */
 int snap_fd = -1;
-// int dir_fd = -1;
+void *snap_mem = nullptr;
+size_t snap_sz_bytes = 0;
+
 int famus_snap_sync(int bfd) {
   struct stat sb;
-
-  if (snap_fd == -1) {
-    const std::string bfname = nvsl::fd_to_fname(bfd);
-    const std::string snapshot_file = bfname + ".snapshot";
-
-    snap_fd = open(snapshot_file.c_str(), O_CREAT | O_WRONLY, S_IWUSR);
-    if (snap_fd == -1) {
-      DBGE << "Unable to open fd for the snapshot file " << snapshot_file
-           << "\n";
-      DBGE << PSTR() << "\n";
-      exit(1);
-    }
-  }
 
   auto fatal_if = [&](bool cond, std::string fname, int line) {
     if (cond) {
@@ -61,7 +53,31 @@ int famus_snap_sync(int bfd) {
     }
   };
 
+  if (snap_fd == -1) {
+    const std::string bfname = nvsl::fd_to_fname(bfd);
+    const std::string snapshot_file = bfname + ".snapshot";
+
+    snap_fd = open(snapshot_file.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
+    if (snap_fd == -1) {
+      DBGE << "Unable to open fd for the snapshot file " << snapshot_file
+           << "\n";
+      DBGE << PSTR() << "\n";
+      exit(1);
+    }
+
+    int dir_fd =
+        open(std::filesystem::path(bfname).parent_path().c_str(), O_RDONLY);
+    fatal_if(dir_fd == -1, __FILE__, __LINE__);
+    fatal_if((fsync(dir_fd) == -1), __FILE__, __LINE__);
+  }
+
+  if (snap_mem != nullptr) {
+    msync(snap_mem, snap_sz_bytes, MS_SYNC);
+  }
+
   nvsl::Clock clk;
+
+  fatal_if((-1 == fsync(snap_fd)), __FILE__, __LINE__);
 
   fatal_if((0 != fstat(snap_fd, &sb)), __FILE__, __LINE__);
   // fatal_if((!rwperm(sb.st_mode, 0, 1)), __FILE__, __LINE__);
@@ -78,5 +94,14 @@ int famus_snap_sync(int bfd) {
   fatal_if((!rwperm(sb.st_mode, 1, 0)), __FILE__, __LINE__);
   fatal_if((0 != fsync(snap_fd)), __FILE__, __LINE__);
   fatal_if((0 != lseek(snap_fd, 0, SEEK_SET)), __FILE__, __LINE__);
+
+  if (snap_mem == nullptr) {
+    snap_mem = mmap(nullptr, sb.st_size, PROT_NONE, MAP_SHARED, snap_fd, 0);
+    DBGE << nvsl::mmap_to_str(nullptr, sb.st_size, PROT_READ, MAP_SHARED,
+                              snap_fd, 0)
+         << "\n";
+    fatal_if((snap_mem == MAP_FAILED), __FILE__, __LINE__);
+  }
+
   return 0;
 }
