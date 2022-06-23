@@ -71,51 +71,41 @@ args_t parse_args(std::vector<std::string> args_v) {
   return args;
 }
 
+void append_node(mmf *res, linkedlist_t *ll_obj, uint64_t val,
+                 bool exit_mid_tx = false) {
+  if (ll_obj->head == NULL) {
+    node_t *head = (node_t *)res->allocate(sizeof(node_t));
 
-void append_node(mmf *res, linkedlist_t *ll_obj,
-                 uint64_t val, bool exit_mid_tx = false) {
-  // TX_BEGIN(res) {
-    // TX_ADD(ll_obj);
+    head->data = 0;
+    head->next = nullptr;
 
-    if (ll_obj->head == NULL) {
-      node_t *head = (node_t*)res->allocate(sizeof(node_t));
-
-      std::memset(head, 0, sizeof(node_t));
-
-      if (head == NULL) {
-        throw std::runtime_error("res->allocate<>() failed");
-      }
-
-      ll_obj->head = head;
-      ll_obj->tail = head;
-
-    } else {
-      node_t *newTail = (node_t*)res->allocate(sizeof(node_t));
-
-      if (newTail == nullptr) {
-        throw std::runtime_error("res->allocate<>() failed");
-      }
-
-      std::memset(newTail, 0, sizeof(node_t));
-
-      // TX_ADD(ll_obj->tail);
-
-      ll_obj->tail->next = newTail;
-      ll_obj->tail = newTail;
-
-      // std::cerr << "Updated tail " << (void*)&ll_obj->tail << std::endl;
+    if (head == NULL) {
+      throw std::runtime_error("res->allocate<>() failed");
     }
 
-    ll_obj->tail->data = val;
+    ll_obj->head = head;
+    ll_obj->tail = head;
 
-    if (exit_mid_tx) {
-      std::cout << "*** EXITING MID TX ***" << std::endl;
-      exit(0);
+  } else {
+    node_t *newTail = (node_t *)res->allocate(sizeof(node_t));
+
+    if (newTail == nullptr) {
+      throw std::runtime_error("res->allocate<>() failed");
     }
-    msync(res->get_address(), res->get_size(), MS_SYNC);
 
-  // }
-  // TX_END;
+    newTail->next = nullptr;
+
+    ll_obj->tail->next = newTail;
+    ll_obj->tail = newTail;
+  }
+
+  ll_obj->tail->data = val;
+
+  if (exit_mid_tx) {
+    std::cout << "*** EXITING MID TX ***" << std::endl;
+    exit(0);
+  }
+  msync(res->get_address(), res->get_size(), MS_SYNC);
 }
 
 void count_nodes(linkedlist_t *ll_obj) {
@@ -155,31 +145,40 @@ void package_reservoir(mmf *res, const std::string &path,
 }
 
 void pop_head(mmf *res, linkedlist_t *ll_obj) {
-  // TX_BEGIN(res) {
-    if (ll_obj->head == nullptr) {
-      // std::cout << "list empty" << std::endl;
+  if (ll_obj->head != nullptr) {
+    node_t *oldNode;
+    if (ll_obj->head == ll_obj->tail) {
+      oldNode = ll_obj->head;
+      ll_obj->head = nullptr;
+      ll_obj->tail = nullptr;
     } else {
-      // TX_ADD(ll_obj);
-      node_t *oldNode;
-      if (ll_obj->head == ll_obj->tail) {
-        oldNode = ll_obj->head;
-        ll_obj->head = nullptr;
-        ll_obj->tail = nullptr;
-      } else {
-        oldNode = ll_obj->head;
-        node_t *newHead = ll_obj->head->next;
-        ll_obj->head = newHead;
-      }
-      res->deallocate(oldNode);
-      // TX_ADD_ON_COMPLETE(([=]() { res->free(oldNode); }));
+      oldNode = ll_obj->head;
+      node_t *newHead = ll_obj->head->next;
+      ll_obj->head = newHead;
     }
-  // }
-  // TX_END;
-    msync(res->get_address(), res->get_size(), MS_SYNC);
+    res->deallocate(oldNode);
+  }
+
+  msync(res->get_address(), res->get_size(), MS_SYNC);
 }
 
-void bulk_append_nodes(mmf *res, linkedlist_t *ll_obj,
-                       const uint64_t cnt) {
+void append_head(mmf *res, linkedlist_t *ll_obj, uint64_t val) {
+  node_t *newHead = (node_t *)res->allocate(sizeof(node_t));
+  newHead->data = val;
+
+  newHead->next = ll_obj->head;
+  ll_obj->head = newHead;
+
+  if (newHead == nullptr) {
+    throw std::runtime_error("res->allocate<>() failed");
+  }
+
+  if (ll_obj->tail == nullptr) {
+    ll_obj->tail = newHead;
+  }
+}
+
+void bulk_append_nodes(mmf *res, linkedlist_t *ll_obj, const uint64_t cnt) {
   Clock clk;
   clk.tick();
   for (auto i = 0ULL; i < cnt; ++i) {
@@ -243,26 +242,18 @@ size_t sum_nodes(const linkedlist_t *ll_obj, bool print = true) {
 }
 
 int main(int argc, char *argv[]) {
-  // register_filt_fun(typeid(node_t), node_t::filter);
-  // register_filt_fun(typeid(linkedlist_t), linkedlist_t::filter);
-
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
 
   auto res =
       new mmf(bip::open_or_create, args.puddle_path.c_str(), MIN_POOL_SZ * 128);
-  // reservoir_t *res =
-  // new reservoir_t(libpuddles::MIN_POOL_SZ * 10, args.puddle_path.c_str());
 
   auto root_ptr = res->find<linkedlist_t>("root").first;
 
   if (root_ptr == NULL) {
     std::cout << "Allocating root" << std::endl;
 
-    // TX_BEGIN(res) {
     root_ptr = res->construct<linkedlist_t>("root")();
     std::cerr << "Root allocated at " << (void *)root_ptr << std::endl;
-    // }
-    // TX_END;
 
     if (root_ptr == NULL) {
       throw std::runtime_error("Allocating root failed");
@@ -273,19 +264,23 @@ int main(int argc, char *argv[]) {
     std::cout << "Got previous root" << (void *)root_ptr << std::endl;
   }
 
-  // printf("Root uuid: %s\n", res->get_root_uuid().to_string().c_str());
+  std::cerr << "Root.head = " << (void *)root_ptr->head << std::endl;
+  std::cerr << "Root.tail = " << (void *)root_ptr->tail << std::endl;
 
   size_t op_count = 0;
 
   printf("Type 'h' for help\n$ ");
 
   startTracking = true;
-  append_node(res, root_ptr, 1);
+  append_head(res, root_ptr, 1);
   pop_head(res, root_ptr);
   msync(root_ptr, 4096, MS_SYNC);
 
   char buf[1024];
   while (fgets(buf, sizeof(buf), stdin)) {
+    std::cerr << "Root.head = " << (void *)root_ptr->head << std::endl;
+    std::cerr << "Root.tail = " << (void *)root_ptr->tail << std::endl;
+
     if (buf[0] == 0 || buf[0] == '\n') {
       std::cout << "$ ";
       continue;

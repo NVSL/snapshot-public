@@ -18,6 +18,7 @@
 
 #include <fcntl.h>
 #include <filesystem>
+#include <ranges>
 #include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <unordered_set>
@@ -89,15 +90,15 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
     const auto toks = split(log, ",", 3);
     const auto pid = std::stoi(toks[0]);
     const auto tid = std::stoull(toks[1]);
-    auto addr = (void*)std::stoull(toks[2]);
+    auto addr = (void *)std::stoull(toks[2]);
 
-    DBGH(4) << "Log pid = " << pid << " tid = " << tid << " addr = "
-            << (void*)addr << std::endl;
+    DBGH(4) << "Log pid = " << pid << " tid = " << tid
+            << " addr = " << (void *)addr << std::endl;
 
-    const auto [log_ptr, lfname]
-      = Log::get_log_by_id(S(pid) + "." + S(tid));
+    const auto [log_ptr, lfname] = Log::get_log_by_id(S(pid) + "." + S(tid));
 
-    DBGH(4) << "Total log size " << log_ptr->log_offset << " bytes" << std::endl;
+    DBGH(4) << "Total log size " << log_ptr->log_offset << " bytes"
+            << std::endl;
 
     DBGH(1) << "Replaying log" << std::endl;
 
@@ -116,7 +117,7 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
     // Map this file to the right address
     void *maddr = real_mmap(addr, this->len, prot, flags, fd, 0);
 
-    if (maddr == (void*)-1) {
+    if (maddr == (void *)-1) {
       DBGE << "Unable to mmap file " << fpath << " to recover" << std::endl;
       DBGE << PSTR();
       exit(1);
@@ -125,32 +126,47 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
     // Find log entries that apply to this file
     using log_entry_t = Log::log_entry_t;
     size_t cur_off = 0;
+    std::vector<size_t> log_entries;
+
+    /* Undo log is applied last entry first, so we need to find all the log
+       entires first */
     while (cur_off < log_ptr->log_offset) {
-      log_entry_t *entry = (log_entry_t*)&(((char*)log_ptr->content)[cur_off]);
+      log_entry_t *entry =
+          (log_entry_t *)&(((char *)log_ptr->content)[cur_off]);
 
       DBGH(4) << "Checking entry (" << entry->addr << ", " << entry->bytes
               << ")" << std::endl;
-      
-      if (((size_t)addr <= entry->addr) and
-          (entry->addr < ((size_t)addr + this->len)) /*and entry->is_disabled != 1*/) {
 
-        const auto dst_addr = (void*)(size_t)entry->addr;
+      if (((size_t)addr <= entry->addr) and
+          (entry->addr <
+           ((size_t)addr + this->len)) /*and entry->is_disabled != 1*/) {
+
+        const auto dst_addr = (void *)(size_t)entry->addr;
 
         DBGH(4) << "Recovering location " << dst_addr << "...";
 
-        // Write, flush and drain
-        real_memcpy(dst_addr, entry->content, entry->bytes);
-        pmemops->flush(dst_addr, entry->bytes);
-        pmemops->drain();
+        log_entries.push_back(cur_off);
 
         DBG << "done" << std::endl;
       } else {
-        DBGH(4) << "No recovery needed"<< std::endl;
+        DBGH(4) << "No recovery needed" << std::endl;
       }
 
       cur_off += entry->bytes + sizeof(log_entry_t);
 
       DBGH(4) << "New offset = " << cur_off << std::endl;
+    }
+
+    /* Apply the undo logs in the reverse order */
+    for (const auto &entry_off : log_entries | std::views::reverse) {
+      const log_entry_t *entry =
+          (log_entry_t *)&(((char *)log_ptr->content)[entry_off]);
+      const auto dst_addr = (void *)(size_t)entry->addr;
+
+      // Write, flush and drain
+      real_memcpy(dst_addr, entry->content, entry->bytes);
+      pmemops->flush(dst_addr, entry->bytes);
+      pmemops->drain();
     }
 
     // Release all resources

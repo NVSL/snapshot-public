@@ -75,8 +75,13 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
         (log_area->log_offset - last_flush_offset + 63) / 64;
 
     DBGH(4) << "Entry size = " << entry_sz << " bytes."
+            << " address = " << (void *)start
             << " last_flush_offset = " << last_flush_offset
             << " log_area->log_offset = " << log_area->log_offset << std::endl;
+
+    if (bytes == 8) {
+      DBGH(4) << "Old value = " << (void *)(*(uint64_t *)start) << std::endl;
+    }
 
     /* Flush all the lines only if the current entry ends at a cacheline
        boundary */
@@ -106,16 +111,9 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
 #endif
 
 #ifdef TRACE_LOG_MSYNC
-    const auto ret_addr = __builtin_return_address(0);
-
-    Dl_info info;
-    dladdr(ret_addr, &info);
-    write(trace_fd, info.dli_sname, strlen(info.dli_sname));
-
-    const std::string entry_str =
-        S(ret_addr) + "," + S(start) + "," + S(bytes) + "\n";
-    write(trace_fd, ",", 1);
-    write(trace_fd, entry_str.c_str(), strlen(entry_str.c_str()));
+    if (startTracking) {
+      std::cout << nvsl::get_stack_trace() << "\n";
+    }
 #endif
 
     NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
