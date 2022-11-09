@@ -30,6 +30,11 @@ To run tests:
   make tests
 #+end_src
 
+** Example environment for compilation
+#+begin_src shell
+export LLVM_DIR=/usr/lib/llvm-13/ DCLANG_LIBS_DIR="/home/smahar/git/cxlbuf-emul/lib" NVSL_LOG_LEVEL=4 LD_LIBS_DIR=/home/smahar/git/cxlbuf/lib/
+#+end_src
+
 ** Enivronment variables
 
 **** Configuration
@@ -56,3 +61,5 @@ To run tests:
 | NVSL_FORCE_CLWB        | {1,0,-}         | Uses clwb (if supported) for persisting data         |
 | NVSL_FORCE_CLFLUSH_OPT | {1,0,-}         | Uses clflushopt (if supported) for persisting data   |
 | NVSL_FORCE_NO_PERSIST  | {1,0,-}         | All persistent operations (flush/drain) are disabled |
+
+
