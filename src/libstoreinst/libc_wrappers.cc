@@ -291,170 +291,188 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
   auto pm_back = RCast<uint8_t *>(cxlbuf::backing_file_start);
 
-  tls_log.flush_all();
-
-  /* Drain all the stores to the log and update its state before modifying the
-     backing file */
-  tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
-
-  if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
-    DBGE << "MS_FORCE_SNAPSHOT called with no sign of instrumentation\n";
-    exit(1);
+  if (tls_logs == nullptr) {
+    tls_logs = new std::vector<nvsl::cxlbuf::Log *>;
   }
 
-  DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
-          << ")\n";
-  if (storeInstEnabled) [[likely]] {
-    if (firstSnapshot) [[unlikely]] {
-      DBGH(1) << "== First snapshot ==" << std::endl;
-      firstSnapshot = false;
+  for (auto tls_log_ptr : *tls_logs) {
+    auto &tls_log = *tls_log_ptr;
 
-      /* If this is the first snapshot, copy all the mapped regions from their
-         source to the backing files. This allows us to get the two copies on
-         parity. */
-      for (const auto &entry : cxlbuf::mapped_addr) {
-        const auto fname = entry.second.fpath;
-        const auto erange = entry.second.range;
+    tls_log.flush_all();
 
-        if (erange.start <= (size_t)addr and erange.end > (size_t)addr) {
-          DBGH(2) << "Found the entry " << entry.first
-                  << " (=" << fs::path(fname) << ") [" << (void *)erange.start
-                  << ", " << (void *)erange.end << "]" << std::endl;
+    /* Drain all the stores to the log and update its state before modifying the
+       backing file */
+    tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
 
-          const size_t off = erange.start - 0x10000000000;
-          void *dst = RCast<uint8_t *>(nvsl::cxlbuf::backing_file_start) + off;
-
-          const void *src = (void *)(erange.start);
-
-          const size_t memcpy_sz =
-              fname == "" ? (erange.end - erange.start) : fs::file_size(fname);
-
-          /* Copy all the allocated bytes from the actual file to the backing */
-          DBGH(4) << "Calling real_memcpy(" << dst << ", " << src << ", "
-                  << memcpy_sz << ")" << std::endl;
-          real_memcpy(dst, src, memcpy_sz);
-          break;
-        }
-      }
+    if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
+      DBGE << "MS_FORCE_SNAPSHOT called with no sign of instrumentation\n";
+      exit(1);
     }
 
-    DBGH(1) << "Calling snapshot (not msync)" << std::endl;
+    DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
+            << ")\n";
+    if (storeInstEnabled) [[likely]] {
+      if (firstSnapshot) [[unlikely]] {
+        DBGH(1) << "== First snapshot ==" << std::endl;
+        firstSnapshot = false;
 
-    size_t total_proc = 0;
-    size_t bytes_flushed = 0;
-    size_t start = (uint64_t)addr, end = (uint64_t)addr + bytes;
-    size_t diff = end - start;
+        /* If this is the first snapshot, copy all the mapped regions from their
+           source to the backing files. This allows us to get the two copies on
+           parity. */
+        for (const auto &entry : cxlbuf::mapped_addr) {
+          const auto fname = entry.second.fpath;
+          const auto erange = entry.second.range;
+
+          if (erange.start <= (size_t)addr and erange.end > (size_t)addr) {
+            DBGH(2) << "Found the entry " << entry.first
+                    << " (=" << fs::path(fname) << ") [" << (void *)erange.start
+                    << ", " << (void *)erange.end << "]" << std::endl;
+
+            const size_t off = erange.start - 0x10000000000;
+            void *dst =
+                RCast<uint8_t *>(nvsl::cxlbuf::backing_file_start) + off;
+
+            const void *src = (void *)(erange.start);
+
+            const size_t memcpy_sz = fname == "" ? (erange.end - erange.start)
+                                                 : fs::file_size(fname);
+
+            /* Copy all the allocated bytes from the actual file to the backing
+             */
+            DBGH(4) << "Calling real_memcpy(" << dst << ", " << src << ", "
+                    << memcpy_sz << ")" << std::endl;
+            real_memcpy(dst, src, memcpy_sz);
+            break;
+          }
+        }
+      }
+
+      DBGH(1) << "Calling snapshot (not msync)" << std::endl;
+
+      size_t total_proc = 0;
+      size_t bytes_flushed = 0;
+      size_t start = (uint64_t)addr, end = (uint64_t)addr + bytes;
+      size_t diff = end - start;
 
 #if LOG_FORMAT_VOLATILE
-    const auto &log_list = tls_log.entries;
+      const auto &log_list = tls_log.entries;
 #elif LOG_FORMAT_NON_VOLATILE
-    const auto &log_list = *tls_log.log_area;
+      const auto &log_list = *tls_log.log_area;
 #else
 #error "Log format needs to be volatile or non-volatile."
 #endif
 
-    for (const auto &entry : log_list) {
-      /* Copy the logged location to the backing store if in range of
-         snapshot */
-      if (entry.addr - start <= diff) [[likely]] {
-        const size_t offset = entry.addr - (uint64_t)start_addr;
-        const size_t dst_addr = (size_t)(pm_back + offset);
+      size_t applied_cnt = 0, entry_cnt = 0;
+      for (const auto &entry : log_list) {
+        /* Copy the logged location to the backing store if in range of
+           snapshot */
+        entry_cnt++;
+        if (entry.addr - start <= diff) [[likely]] {
+          const size_t offset = entry.addr - (uint64_t)start_addr;
+          const size_t dst_addr = (size_t)(pm_back + offset);
 
-        DBGH(4) << "Copying " << entry.bytes << " bytes from "
-                << (void *)(0UL + entry.addr) << " -> " << (void *)dst_addr
-                << std::endl;
+          applied_cnt++;
+
+          DBGH(4) << "Copying " << entry.bytes << " bytes from "
+                  << (void *)(0UL + entry.addr) << " -> " << (void *)dst_addr
+                  << std::endl;
 
 #ifdef CXLBUF_ALIGN_SNAPSHOT_WRITES
-        const bool str_wr_allowed = true;
+          const bool str_wr_allowed = true;
 #else
-        /* Streaming write is only allowed if the write size is a power of two
-           (popcount == 1) and dest address is aligned at entry.bytes */
-        const bool str_wr_allowed =
-            (std::popcount(entry.bytes) == 1) and (dst_addr % entry.bytes == 0);
+          /* Streaming write is only allowed if the write size is a power of two
+             (popcount == 1) and dest address is aligned at entry.bytes */
+          const bool str_wr_allowed = (std::popcount(entry.bytes) == 1) and
+                                      (dst_addr % entry.bytes == 0);
 #endif // CXLBUF_ALIGN_SNAPSHOT_WRITES
-        if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
-          size_t dst_addr_aligned = dst_addr;
+          if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
+            size_t dst_addr_aligned = dst_addr;
 
-          auto previousPowerOfTwo = [](size_t x) -> size_t {
-            return ((sizeof(x) * 8 - 1) - __builtin_clzl(x));
-          };
+            auto previousPowerOfTwo = [](size_t x) -> size_t {
+              return ((sizeof(x) * 8 - 1) - __builtin_clzl(x));
+            };
 
-          size_t prev_pwr_2 = previousPowerOfTwo(entry.bytes) + 1;
-          size_t align_to = prev_pwr_2 > 9 ? 9 : prev_pwr_2;
-          align_to =
-              (std::popcount(entry.bytes) == 1) ? align_to - 1 : align_to;
+            size_t prev_pwr_2 = previousPowerOfTwo(entry.bytes) + 1;
+            size_t align_to = prev_pwr_2 > 9 ? 9 : prev_pwr_2;
+            align_to =
+                (std::popcount(entry.bytes) == 1) ? align_to - 1 : align_to;
 
-          dst_addr_aligned >>= align_to;
-          dst_addr_aligned <<= align_to;
+            dst_addr_aligned >>= align_to;
+            dst_addr_aligned <<= align_to;
 
-          size_t modulo = dst_addr & ((1 << align_to) - 1);
+            size_t modulo = dst_addr & ((1 << align_to) - 1);
 
-          dst_addr_aligned = (modulo == 0) ? dst_addr : dst_addr_aligned;
+            dst_addr_aligned = (modulo == 0) ? dst_addr : dst_addr_aligned;
 
-          size_t new_sz = entry.bytes + (dst_addr - dst_addr_aligned);
+            size_t new_sz = entry.bytes + (dst_addr - dst_addr_aligned);
 
-          DBGH(4) << "Aligned " << (void *)dst_addr << " to "
-                  << (void *)dst_addr_aligned << " with new size = " << new_sz
-                  << "\n";
+            DBGH(4) << "Aligned " << (void *)dst_addr << " to "
+                    << (void *)dst_addr_aligned << " with new size = " << new_sz
+                    << "\n";
 
 #ifdef CXLBUF_ALIGN_SNAPSHOT_WRITES
-          const size_t dst_addr_arg = dst_addr_aligned;
-          const size_t src_addr_arg =
-              entry.addr - (dst_addr_aligned - dst_addr);
+            const size_t dst_addr_arg = dst_addr_aligned;
+            const size_t src_addr_arg =
+                entry.addr - (dst_addr_aligned - dst_addr);
 #else
-          const size_t dst_addr_arg = dst_addr;
-          const size_t src_addr_arg = entry.addr;
+            const size_t dst_addr_arg = dst_addr;
+            const size_t src_addr_arg = entry.addr;
 #endif
 
-          pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
-                                new_sz);
-        } else {
-          real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
-                      entry.bytes);
-          pmemops->flush((void *)dst_addr, entry.bytes);
+            pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
+                                  new_sz);
+          } else {
+            real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
+                        entry.bytes);
+            pmemops->flush((void *)dst_addr, entry.bytes);
+          }
+        } else if (entry.addr == 0) {
+          break;
         }
-      } else if (entry.addr == 0) {
-        break;
+
+        bytes_flushed += entry.bytes;
+        total_proc++;
       }
 
-      bytes_flushed += entry.bytes;
-      total_proc++;
-    }
-
-    DBGH(4) << "total_proc = " << total_proc << "\n";
-    DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
+      DBGH(4) << "total_proc = " << total_proc << "\n";
+      DBGH(4) << "bytes_flushed = " << bytes_flushed << "\n";
 
 #ifndef RELEASE
-    cxlbuf::tx_log_count_dist->add(total_proc);
+      cxlbuf::tx_log_count_dist->add(total_proc);
 #endif
 
 #ifdef CXLBUF_TESTING_GOODIES
-    if (crashOnCommit) [[unlikely]] {
-      DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)"
-           << std::endl;
-      exit(1);
-    }
+      if (crashOnCommit) [[unlikely]] {
+        DBGW << "Crashing before commit (CXLBUF_CRASH_ON_COMMIT is set)"
+             << std::endl;
+        exit(1);
+      }
 #endif // CXLBUF_TESTING_GOODIES
 
-    /* Update the state to drop the log and drain all the updates to the
-       backing file */
-    pmemops->drain();
-    tls_log.set_state(cxlbuf::Log::State::EMPTY);
-  } else {
-    DBGH(1) << "Calling real msync" << std::endl;
+      /* Update the state to drop the log and drain all the updates to the
+         backing file */
+      pmemops->drain();
 
-    void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
+      if (applied_cnt == entry_cnt) {
+        tls_log.set_state(cxlbuf::Log::State::EMPTY);
+      }
+    } else {
+      DBGH(1) << "Calling real msync" << std::endl;
 
-    const int mret = real_msync(pg_aligned, bytes, flags);
+      void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
 
-    if (-1 == mret) {
-      DBGE << "msync(" << pg_aligned << ", " << bytes << ", " << flags << ")\n";
-      perror("msync for snapshot failed");
-      exit(1);
+      const int mret = real_msync(pg_aligned, bytes, flags);
+
+      if (-1 == mret) {
+        DBGE << "msync(" << pg_aligned << ", " << bytes << ", " << flags
+             << ")\n";
+        perror("msync for snapshot failed");
+        exit(1);
+      }
     }
-  }
 
-  tls_log.clear();
+    tls_log.clear();
+  }
 
 #ifdef CXLBUF_TESTING_GOODIES
   perst_overhead_clk->tock();

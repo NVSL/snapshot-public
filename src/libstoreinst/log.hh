@@ -30,8 +30,8 @@ namespace nvsl {
        * @brief struct for storing log in persistent memory
        */
       struct log_entry_t {
-        // uint8_t is_disabled : 8;
-        uint64_t bytes : 24;
+        uint8_t disabled : 1;
+        uint64_t bytes : 23;
         uint64_t addr : 56;
 
         NVSL_BEGIN_IGNORE_WPEDANTIC
@@ -210,10 +210,13 @@ namespace nvsl {
       void flush_all() const;
     };
 
+    void cxlbuf_reg_tls_log();
+
     extern nvsl::Counter *skip_check_count, *logged_check_count;
     extern nvsl::StatsFreq<> *tx_log_count_dist;
   } // namespace cxlbuf
 } // namespace nvsl
 
-extern thread_local nvsl::cxlbuf::Log tls_log;
+extern thread_local nvsl::cxlbuf::Log local_log;
 extern int trace_fd;
+extern std::vector<nvsl::cxlbuf::Log *> *tls_logs;

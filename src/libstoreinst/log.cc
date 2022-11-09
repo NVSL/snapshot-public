@@ -50,11 +50,11 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     perst_overhead_clk->tick();
 #endif // CXLBUF_TESTING_GOODIES
 
-#ifndef NDEBUG
-    NVSL_ASSERT((bytes < (1 << 23)), "Log request to location " +
+    // #ifndef NDEBUG
+    NVSL_ASSERT((bytes < (1 << 22)), "Log request to location " +
                                          S((void *)start) + " for " + S(bytes) +
                                          " bytes is invalid");
-#endif
+    // #endif
 
 #ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
@@ -171,14 +171,14 @@ cxlbuf::Log::get_log_by_id(const std::string &name,
   return {log_ptr, log_fname};
 }
 
-void cxlbuf::Log::init_dirs() {
+void nvsl::cxlbuf::Log::init_dirs() {
   DBGH(1) << "Creating log directory " << fs::path(*log_loc) << std::endl;
   if (not std::filesystem::is_directory(*log_loc)) {
     std::filesystem::create_directory(*log_loc);
   }
 }
 
-void cxlbuf::Log::init_thread_buf() {
+void nvsl::cxlbuf::Log::init_thread_buf() {
   const auto tid = pthread_self();
   const auto pid = getpid();
 
@@ -222,7 +222,7 @@ void cxlbuf::Log::init_thread_buf() {
   close(fd);
 }
 
-cxlbuf::Log::Log() {
+nvsl::cxlbuf::Log::Log() {
 #ifdef LOG_FORMAT_VOLATILE
   entries.reserve(Log::MAX_ENTRIES);
 #endif
@@ -231,4 +231,13 @@ cxlbuf::Log::Log() {
   this->init_thread_buf();
 }
 
-thread_local cxlbuf::Log tls_log;
+void nvsl::cxlbuf::cxlbuf_reg_tls_log() {
+  if (tls_logs) {
+    tls_logs = new std::vector<nvsl::cxlbuf::Log *>;
+  }
+
+  tls_logs->push_back(&tls_log);
+}
+
+thread_local nvsl::cxlbuf::Log thread_local_log;
+std::vector<nvsl::cxlbuf::Log *> *tls_logs = nullptr;

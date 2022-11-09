@@ -140,7 +140,6 @@ void cxlbuf::PmemFile::recover(const std::vector<std::string> &logs) {
       if (((size_t)addr <= entry->addr) and
           (entry->addr <
            ((size_t)addr + this->len)) /*and entry->is_disabled != 1*/) {
-
         const auto dst_addr = (void *)(size_t)entry->addr;
 
         DBGH(4) << "Recovering location " << dst_addr << "...";
