@@ -11,7 +11,7 @@ namespace nvsl {
     int open(const char *pathname, int flags);
 
     /**
-     * @brief Close and existing vram_fd
+     * @brief Close an existing vram_fd
      */
     void *close(int fd);
 

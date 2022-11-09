@@ -134,7 +134,7 @@ void mb_msyncscaling(bool use_real_msync) {
   msync_thread((void *)ta);
   clk.tock();
 
-  double elapsed_us = clk.ns() / 1000.0;
+  //  double elapsed_us = clk.ns() / 1000.0;
 
   // std::cout << 0 << ", " << elapsed_us / (double)(MAX_LOOPS) << "\n";
 }

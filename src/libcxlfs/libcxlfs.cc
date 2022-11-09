@@ -13,8 +13,6 @@
 #include <sys/mman.h>
 #include <vector>
 
-#include "libvram/libvram.hh"
-#include "libvramfs/libvramfs.hh"
 #include "libcxlfs/libcxlfs.hh"
 #include "nvsl/common.hh"
 #include "nvsl/utils.hh"
