@@ -38,11 +38,11 @@ static inline int rwperm(mode_t m, unsigned int r, unsigned int w) {
  * sharing that makes snapshots efficient; read "man ioctl_ficlone".  The
  * "ioctl(FICLONE)" works only on reflink-enabled file systems, e.g., BtrFS,
  * XFS, OCFS2. */
-int snap_fd = -1;
-void *snap_mem = nullptr;
-size_t snap_sz_bytes = 0;
+int snap_fd0 = -1, snap_fd1 = -1;
+int fd_switch = 0;
+size_t msync_cnt = 0;
 
-int famus_snap_sync(int bfd) {
+int famus_snap_sync(int bfd, void *bf_mem, size_t bf_sz) {
   struct stat sb;
 
   auto fatal_if = [&](bool cond, std::string fname, int line) {
@@ -53,13 +53,22 @@ int famus_snap_sync(int bfd) {
     }
   };
 
-  if (snap_fd == -1) {
+  if (snap_fd0 == -1) {
     const std::string bfname = nvsl::fd_to_fname(bfd);
-    const std::string snapshot_file = bfname + ".snapshot";
+    const std::string snapshot0_file = bfname + ".snapshot0";
+    const std::string snapshot1_file = bfname + ".snapshot1";
 
-    snap_fd = open(snapshot_file.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
-    if (snap_fd == -1) {
-      DBGE << "Unable to open fd for the snapshot file " << snapshot_file
+    snap_fd0 = open(snapshot0_file.c_str(), O_CREAT | O_RDWR, S_IWUSR);
+    if (snap_fd0 == -1) {
+      DBGE << "Unable to open fd for the snapshot file " << snapshot0_file
+           << "\n";
+      DBGE << PSTR() << "\n";
+      exit(1);
+    }
+
+    snap_fd1 = open(snapshot1_file.c_str(), O_CREAT | O_RDWR, S_IWUSR);
+    if (snap_fd1 == -1) {
+      DBGE << "Unable to open fd for the snapshot file " << snapshot1_file
            << "\n";
       DBGE << PSTR() << "\n";
       exit(1);
@@ -71,9 +80,9 @@ int famus_snap_sync(int bfd) {
     fatal_if((fsync(dir_fd) == -1), __FILE__, __LINE__);
   }
 
-  if (snap_mem != nullptr) {
-    msync(snap_mem, snap_sz_bytes, MS_SYNC);
-  }
+  fatal_if(0 != msync(bf_mem, bf_sz, MS_SYNC), __FILE__, __LINE__);
+
+  int snap_fd = fd_switch ? snap_fd0 : snap_fd1;
 
   nvsl::Clock clk;
 
@@ -85,6 +94,17 @@ int famus_snap_sync(int bfd) {
   clk.reset();
   clk.tick();
   fatal_if((0 != ioctl(snap_fd, FICLONE, bfd)), __FILE__, __LINE__);
+
+  const std::string cmd_snapshot =
+      "xfs_bmap /mnt/pmem0p4/microbench.0.snapshot0 > /tmp/xfs_bmap.snapshot0" +
+      nvsl::S(msync_cnt) + ".txt";
+  const std::string cmd_backing =
+      "xfs_bmap /mnt/pmem0p4/microbench.0 > /tmp/xfs_bmap.backing" +
+      nvsl::S(msync_cnt) + ".txt";
+  msync_cnt++;
+  fatal_if(0 != system(cmd_snapshot.c_str()), __FILE__, __LINE__);
+  fatal_if(0 != system(cmd_backing.c_str()), __FILE__, __LINE__);
+
   clk.tock();
   std::cout << clk.ns() << "\n";
 
@@ -95,13 +115,7 @@ int famus_snap_sync(int bfd) {
   fatal_if((0 != fsync(snap_fd)), __FILE__, __LINE__);
   fatal_if((0 != lseek(snap_fd, 0, SEEK_SET)), __FILE__, __LINE__);
 
-  if (snap_mem == nullptr) {
-    snap_mem = mmap(nullptr, sb.st_size, PROT_NONE, MAP_SHARED, snap_fd, 0);
-    DBGE << nvsl::mmap_to_str(nullptr, sb.st_size, PROT_READ, MAP_SHARED,
-                              snap_fd, 0)
-         << "\n";
-    fatal_if((snap_mem == MAP_FAILED), __FILE__, __LINE__);
-  }
+  fd_switch = not fd_switch;
 
   return 0;
 }

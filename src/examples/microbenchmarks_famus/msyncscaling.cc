@@ -22,7 +22,7 @@
 
 using namespace nvsl;
 
-constexpr size_t MAX_LOOPS = 100;
+constexpr size_t MAX_LOOPS = 1000;
 constexpr size_t MAX_UPDATES = 2;
 constexpr size_t MAX_THREADS = 1;
 constexpr size_t MMAP_SIZE = 1024UL * 1024 * 256;
@@ -52,7 +52,7 @@ void /***/ msync_thread(void *vargp) {
 
     if (ta->use_real_msync) {
       msync(ta->mem_region, MMAP_SIZE, MS_SYNC);
-    } else if (-1 == famus_snap_sync(ta->fd)) {
+    } else if (-1 == famus_snap_sync(ta->fd, ta->mem_region, MMAP_SIZE)) {
       DBGE << "snapshot call failed" << std::endl;
       exit(1);
     }
@@ -134,7 +134,7 @@ void mb_msyncscaling(bool use_real_msync) {
   msync_thread((void *)ta);
   clk.tock();
 
-  double elapsed_us = clk.ns() / 1000.0;
+  // double elapsed_us = clk.ns() / 1000.0;
 
   // std::cout << 0 << ", " << elapsed_us / (double)(MAX_LOOPS) << "\n";
 }
