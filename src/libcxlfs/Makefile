@@ -5,15 +5,17 @@ OBJECTS := $(patsubst %.cc, %.o, $(SOURCES))
 LIB_DIR :=../../lib
 LIB_DIR := $(shell readlink -f $(CURDIR)/$(LIB_DIR))
 
-INCLUDE +=-I./
+INCLUDE +=-I./ $(shell pkg-config --cflags spdk_nvme) $(shell pkg-config --cflags spdk_env_dpdk)
 
 DEPENDS := $(wildcard ../include/* ./*.hh ./*/*.hh)
 
 EXTRA_LDFLAGS := -L$(LIB_DIR) -Wl,-R$(LIB_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-Wl,--whole-archive $(ARCHIVE_DEPENDS) \
 	-Wl,--no-whole-archive
-#EXTRA_LINKFLAGS +=-luuid -lvulkan
-
+EXTRA_LINKFLAGS += $(shell pkg-config --libs spdk_nvme)
+EXTRA_LINKFLAGS += $(shell pkg-config --libs spdk_env_dpdk)
+EXTRA_LINKFLAGS += $(shell pkg-config --libs libisal)
+EXTRA_LINKFLAGS += $(shell pkg-config --libs spdk_vmd)
 TARGET := libcxlfs.so
 
 include ../common.make

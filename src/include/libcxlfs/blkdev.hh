@@ -8,6 +8,8 @@
 
 #pragma once
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 #include "spdk/stdinc.h"
 
 #include "spdk/env.h"
@@ -16,6 +18,7 @@
 #include "spdk/nvme_zns.h"
 #include "spdk/string.h"
 #include "spdk/vmd.h"
+#pragma GCC diagnostic pop
 
 /**
  * @brief Userspace read/write access to NVMe devices
