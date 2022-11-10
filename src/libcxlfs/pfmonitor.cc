@@ -12,10 +12,15 @@
 #include <linux/userfaultfd.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 
 #include "nvsl/common.hh"
 #include "nvsl/error.hh"
+
+int userfaultfd(int flags) {
+  return syscall(SYS_userfaultfd, flags);
+}
 
 class PFMonitor {
 public:
