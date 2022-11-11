@@ -18,7 +18,7 @@ GTEST_DIR=../vendor/googletest/googletest
 USER_DIR=.
 
 LIBPUDDLES_CXXFLAGS:=-iquote../src/include -iquote../vendor/cpp-common/include/ -std=c++20
-LIBPUDDLES_LDFLAGS:=-L../lib/ -Wl,-R../lib/ -lvram -lvramfs -lcxlfs
+LIBPUDDLES_LDFLAGS:=-L$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)vendor/spdk/dpdk/build/lib -Wl,-R$(ROOT_DIR)vendor/spdk/build/lib -lvram -lvramfs -lcxlfs
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
@@ -27,7 +27,7 @@ CPPFLAGS += -isystem $(GTEST_DIR)/include
 
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread $(LIBPUDDLES_CXXFLAGS) \
-	-iquote../src/include
+	-iquote../src/include -Wl,-R../lib/
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
