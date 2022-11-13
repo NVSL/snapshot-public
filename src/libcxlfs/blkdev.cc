@@ -12,6 +12,7 @@
  */
 
 #include <functional>
+#include <spdk/queue_extras.h>
 #include <string>
 
 #include "libcxlfs/blkdev.hh"
@@ -55,15 +56,18 @@ void UserBlkDev::register_ns(struct spdk_nvme_ctrlr *ctrlr,
   entry->ns = ns;
   TAILQ_INSERT_TAIL(&g_namespaces, entry, link);
 
-  DBGH(2) << "Namespace ID: " << spdk_nvme_ns_get_id(ns)
+  DBGH(3) << "Namespace ID: " << spdk_nvme_ns_get_id(ns)
           << " size: " << spdk_nvme_ns_get_size(ns) / 1000000000 << "\n";
 }
 
 void UserBlkDev::io_complete(void *arg, const spdk_nvme_cpl *completion) {
+  DBGH(4) << "IO completion notification\n";
+
   auto sequence = (ubd_sequence *)arg;
 
   /* Assume the I/O was successful */
   sequence->is_completed = 1;
+
   /* See if an error occurred. If so, display information
    * about it, and set completion value so that I/O
    * caller is aware that an error occurred.
@@ -204,20 +208,23 @@ void UserBlkDev::cleanup(void) {
 
   /** @brief Initialize the controllers and IO queues **/
   int UserBlkDev::init() {
+    spdk_log_set_print_level(SPDK_LOG_DEBUG);
+    spdk_log_set_level(SPDK_LOG_DEBUG);
+
     int rc;
     struct spdk_env_opts opts;
 
     spdk_env_opts_init(&opts);
-
-    spdk_nvme_trid_populate_transport(&g_trid, SPDK_NVME_TRANSPORT_PCIE);
-    snprintf(g_trid.subnqn, sizeof(g_trid.subnqn), "%s",
-             SPDK_NVMF_DISCOVERY_NQN);
-
     opts.name = "libcxlfs";
+    opts.shm_id = 0;
     if (spdk_env_init(&opts) < 0) {
       DBGE << "Unable to intialize SPDK env\n";
       return 1;
     }
+
+    spdk_nvme_trid_populate_transport(&g_trid, SPDK_NVME_TRANSPORT_PCIE);
+    snprintf(g_trid.subnqn, sizeof(g_trid.subnqn), "%s",
+             SPDK_NVMF_DISCOVERY_NQN);
 
     DBGH(2) << "Initializing NVMe Controllers\n";
 
@@ -242,7 +249,9 @@ void UserBlkDev::cleanup(void) {
     struct ns_entry *ns_entry;
 
     /* Allocate IO Q pairs */
+    DBGH(4) << "first = " << (&g_namespaces)->tqh_first << std::endl;
     TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
+      DBGH(3) << "Allocating IO Q-pairs" << std::endl;
       ns_entry->qpair =
           spdk_nvme_ctrlr_alloc_io_qpair(ns_entry->ctrlr, NULL, 0);
 
@@ -250,7 +259,11 @@ void UserBlkDev::cleanup(void) {
         DBGE << "spdk_nvme_ctrlr_alloc_io_qpair() failed\n";
         return -1;
       }
+
+      DBGH(3) << "IO Q-pairs allocated\n";
     }
+
+    return rc;
 
   exit:
     cleanup();
@@ -260,40 +273,45 @@ void UserBlkDev::cleanup(void) {
 
   /** @brief Blocking read to an LBA **/
   int UserBlkDev::read_blocking(void *buf, off_t start_lba, off_t lba_count) {
-    struct ns_entry *ns_entry = TAILQ_FIRST(&g_namespaces);
+    struct ns_entry *ns_entry;
     struct ubd_sequence sequence = {0};
     int rc;
 
-    sequence.using_cmb_io = 1;
-    sequence.buf = (char *)spdk_zmalloc(
-        0x1000, 0x1000, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+    DBGH(4) << "first = " << (&g_namespaces)->tqh_first << std::endl;
+    TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
+      sequence.using_cmb_io = 0;
+      sequence.buf =
+          (char *)spdk_zmalloc(lba_count << 9, 0x1000, NULL,
+                               SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
 
-    if (sequence.buf == NULL) {
-      DBGE << "Write buffer allocation failed\n";
-      return -1;
+      if (sequence.buf == NULL) {
+        DBGE << "Read buffer allocation failed\n";
+        return -1;
+      }
+
+      sequence.is_completed = 0;
+      sequence.ns_entry = ns_entry;
+
+      DBGH(4) << "Issuing read command to qpair " << ns_entry->qpair << "\n";
+
+      rc = spdk_nvme_ns_cmd_read(ns_entry->ns, ns_entry->qpair, sequence.buf,
+                                 start_lba, lba_count, io_complete, &sequence,
+                                 0);
+
+      DBGH(2) << "Read return code " << rc << " sequence.is_completed "
+              << sequence.is_completed << std::endl;
+
+      if (rc == 0) {
+        while (not sequence.is_completed) {
+          spdk_nvme_qpair_process_completions(ns_entry->qpair, 0);
+        }
+      }
+
+      memcpy(buf, sequence.buf, lba_count << 9);
+
+      spdk_free(sequence.buf);
+      break;
     }
-
-    sequence.is_completed = 0;
-    sequence.ns_entry = ns_entry;
-
-    /* Check for ZNS */
-    if (spdk_nvme_ns_get_csi(ns_entry->ns) == SPDK_NVME_CSI_ZNS) {
-      reset_zone_and_wait_for_completion(&sequence);
-    }
-
-    rc = spdk_nvme_ns_cmd_read(ns_entry->ns, ns_entry->qpair, sequence.buf,
-                               0, /* LBA start */
-                               1, /* number of LBAs */
-                               io_complete, &sequence, 0);
-
-    if (rc == 0) {
-      while (not sequence.is_completed)
-        ;
-    }
-
-    memcpy(buf, sequence.buf, 0x1000);
-
-    spdk_free(sequence.buf);
 
     return (sequence.is_completed == 1) ? 0 : -1;
   }
@@ -307,17 +325,18 @@ void UserBlkDev::cleanup(void) {
 
     sequence.using_cmb_io = 1;
     sequence.buf = (char *)spdk_nvme_ctrlr_map_cmb(ns_entry->ctrlr, &sz);
-    if (sequence.buf == NULL || sz < 0x1000) {
+    if (sequence.buf == NULL || (off_t)sz < (lba_count << 9)) {
       sequence.using_cmb_io = 0;
-      sequence.buf = (char *)spdk_zmalloc(
-          0x1000, 0x1000, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+      sequence.buf =
+          (char *)spdk_zmalloc(lba_count << 9, 0x1000, NULL,
+                               SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
     }
     if (sequence.buf == NULL) {
       DBGE << "Write buffer allocation failed\n";
       return -1;
     }
 
-    memcpy(sequence.buf, buf, 0x1000);
+    memcpy(sequence.buf, buf, lba_count << 9);
 
     sequence.is_completed = 0;
     sequence.ns_entry = ns_entry;
@@ -328,14 +347,14 @@ void UserBlkDev::cleanup(void) {
       reset_zone_and_wait_for_completion(&sequence);
     }
 
-    rc = spdk_nvme_ns_cmd_write(ns_entry->ns, ns_entry->qpair, sequence.buf,
-                                0, /* LBA start */
-                                1, /* number of LBAs */
-                                io_complete, &sequence, 0);
+    rc =
+        spdk_nvme_ns_cmd_write(ns_entry->ns, ns_entry->qpair, sequence.buf,
+                               start_lba, lba_count, io_complete, &sequence, 0);
 
     if (rc == 0) {
-      while (not sequence.is_completed)
-        ;
+      while (not sequence.is_completed) {
+        spdk_nvme_qpair_process_completions(ns_entry->qpair, 0);
+      }
     }
 
     if (sequence.using_cmb_io) {

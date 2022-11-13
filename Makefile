@@ -44,7 +44,7 @@ lib:
 .PHONY: tests
 tests:
 	$(PUDDLES_MAKE) -C tests/
-	sudo LD_LIBRARY_PATH=$(ROOT_DIR)vendor/spdk/dpdk/build/lib:$(LD_LIBRARY_PATH) tests/test.bin  --gmock_verbose=info --gtest_stack_trace_depth=10
+	sudo NVSL_LOG_LEVEL=4 LD_LIBRARY_PATH=$(ROOT_DIR)vendor/spdk/dpdk/build/lib:$(LD_LIBRARY_PATH) tests/test.bin  --gmock_verbose=info --gtest_stack_trace_depth=10
 	src/scripts/tests/run.sh
 
 
