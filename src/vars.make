@@ -22,3 +22,4 @@ endif
 
 BOOST_CONFIG_PATH ?= $(ROOT_DIR)vendor/config/include
 
+CXLBUF_PKG_CONFIG_PATH="$(PKG_CONFIG_PATH):$(ROOT_DIR)vendor/spdk/build/lib/pkgconfig"

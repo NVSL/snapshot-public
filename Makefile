@@ -1,9 +1,16 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 .PHONY: all
-all: bin lib | check_compiler
+all: bin lib spdk | check_compiler
 	$(PUDDLES_MAKE) -C src
 	$(PUDDLES_MAKE) vendor
+
+vendor/spdk/mk/config.mk:
+	(cd vendor/spdk && ./configure --with-shared )
+
+.PHONY: spdk
+spdk: vendor/spdk/mk/config.mk
+	(cd vendor/spdk && make -j20)
 
 .PHONY: vendor
 vendor:
@@ -37,7 +44,7 @@ lib:
 .PHONY: tests
 tests:
 	$(PUDDLES_MAKE) -C tests/
-	LD_LIBRARY_PATH=lib/:$(LD_LIBRARY_PATH) tests/test.bin  --gmock_verbose=info --gtest_stack_trace_depth=10
+	sudo NVSL_LOG_LEVEL=4 LD_LIBRARY_PATH=$(ROOT_DIR)vendor/spdk/dpdk/build/lib:$(LD_LIBRARY_PATH) tests/test.bin  --gmock_verbose=info --gtest_stack_trace_depth=10
 	src/scripts/tests/run.sh
 
 

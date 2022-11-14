@@ -19,3 +19,6 @@
 [submodule "vendor/preeny"]
 	path = vendor/preeny
 	url = git@github.com:zardus/preeny.git
+[submodule "vendor/spdk"]
+	path = vendor/spdk
+	url = git@github.com:spdk/spdk.git
