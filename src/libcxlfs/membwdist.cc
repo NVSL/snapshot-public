@@ -14,6 +14,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/perf_event.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include "libcxlfs/membwdist.hh"
 #include "nvsl/common.hh"
@@ -114,13 +115,22 @@ std::vector<MemBWDist::record_t> MemBWDist::get_samples() {
 
 MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
   char *samples;
-  size_t sample_cnt = 0;
+  size_t sample_cnt = 0, useful_samples = 0;
+  float useful_samples_pct = 0;
 
-  size_t range = end - start;
+  const size_t pg_sz_bits = (uint)log2(sysconf(_SC_PAGESIZE));
+
+  const auto start_pg = start >> pg_sz_bits;
+  const auto end_pg = end >> pg_sz_bits;
+
+  const size_t range = (end_pg - start_pg);
   dist_t result = new heat_t[range];
 
   auto &tail = sample_buf->data_tail;
   auto &head = sample_buf->data_head;
+
+  DBGH(3) << "[" << start << "," << end << "] -> "
+          << "[" << start_pg << "," << end_pg << "]\n";
 
   samples = RCast<char *>(sample_buf) + sample_buf->data_offset;
 
@@ -128,12 +138,16 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
 
   while (tail != head) {
     const auto sample_addr = samples + (tail % sample_buf->data_size);
-    auto *header = RCast<const perf_event_header *>(sample_addr);
+    const auto *header = RCast<const perf_event_header *>(sample_addr);
 
     if (header->type == PERF_RECORD_SAMPLE) {
-      auto sample = RCast<const pebs_sample_t *>(header);
+      const auto sample = RCast<const pebs_sample_t *>(header);
+      const auto addr_pg = sample->addr >> pg_sz_bits;
 
-      result[sample->addr - start] = true;
+      if (addr_pg >= start_pg and addr_pg < end_pg) {
+        result[addr_pg - start_pg] = true;
+        useful_samples++;
+      }
 
       sample_cnt++;
       tail += header->size;
@@ -142,7 +156,9 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
     }
   }
 
-  DBGH(2) << "Found " << sample_cnt << " samples\n";
+  useful_samples_pct = (useful_samples * 100.0 / (float)sample_cnt);
+  DBGH(2) << "Found " << sample_cnt << ", useful: " << useful_samples << " ("
+          << useful_samples_pct << "%) samples\n";
 
   return result;
 }
