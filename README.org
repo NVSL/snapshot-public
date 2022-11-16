@@ -6,6 +6,7 @@
 - Boost.Move (included)
 - nvsl.cpp-common (included)
 - libvulkan-dev
+- libisal-dev
 
 ** Build
 To build the project:
