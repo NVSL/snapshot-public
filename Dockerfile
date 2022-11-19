@@ -3,6 +3,7 @@ from ubuntu:20.04
 maintainer Suyash Mahar, suyash12mahar@outlook.com
 
 ARG tok
+ENV cxlbuf_branch smahar
 
 # Setup for ssh onto github
 RUN mkdir -p /root/.ssh
@@ -15,10 +16,15 @@ ENV CXX=g++-10
 ENV CC=gcc-10
 
 RUN echo $tok
-run git clone --recursive https://${tok}@github.com/NVSL/cxlbuf.git
+RUN git clone -b $cxlbuf_branch https://${tok}@github.com/NVSL/cxlbuf.git
+
+WORKDIR /cxlbuf/
+RUN git submodule update --init
 
 WORKDIR /cxlbuf/vendor/spdk
-RUN scripts/pkgdep.sh
+RUN git submodule update --init
+
+RUN DEBIAN_FRONTEND=noninteractive scripts/pkgdep.sh
 
 run ./configure
 WORKDIR /cxlbuf/

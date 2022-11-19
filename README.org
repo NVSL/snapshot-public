@@ -24,6 +24,16 @@ Enabling verbose mode for debugging compiler flags:
   V=1 make # or V=1 make release
 #+end_src
 
+** Building the docker image
+1. Get the github personal access token using instructions here:
+   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+
+2. Build the image
+#+begin_src shell
+  docker build --build-arg tok="<personal-access-token>" .
+#+end_src
+
+
 ** Tests
 To run tests:
 #+begin_src shell
