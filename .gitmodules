@@ -1,24 +1,24 @@
 [submodule "vendor/cpp-common"]
 	path = vendor/cpp-common
-	url = git@github.com:nvsl/cpp-common.git
+	url = https://github.com/nvsl/cpp-common.git
 [submodule "vendor/interprocess"]
 	path = vendor/interprocess
-	url = git@github.com:boostorg/interprocess.git
+	url = https://github.com/boostorg/interprocess.git
 [submodule "vendor/move"]
 	path = vendor/move
-	url = git@github.com:boostorg/move.git
+	url = https://github.com/boostorg/move.git
 [submodule "vendor/config"]
 	path = vendor/config
-	url = git@github.com:boostorg/config.git
+	url = https://github.com/boostorg/config.git
 [submodule "vendor/googletest"]
 	path = vendor/googletest
-	url = git@github.com:google/googletest.git
+	url = https://github.com/google/googletest.git
 [submodule "vendor/redis/deps/pmdk"]
 	path = vendor/redis/deps/pmdk
-	url = git@github.com:pmem/pmdk.git
+	url = https://github.com/pmem/pmdk.git
 [submodule "vendor/preeny"]
 	path = vendor/preeny
-	url = git@github.com:zardus/preeny.git
+	url = https://github.com/zardus/preeny.git
 [submodule "vendor/spdk"]
 	path = vendor/spdk
-	url = git@github.com:spdk/spdk.git
+	url = https://github.com/spdk/spdk.git
