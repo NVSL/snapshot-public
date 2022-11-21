@@ -5,7 +5,7 @@
  * @date   novembre 16, 2022
  * @brief  Brief description here
  */
-
+#pragma once
 #include <functional>
 
 #include "libcxlfs/pfmonitor.hh"
@@ -14,14 +14,12 @@
 
 class Controller {
 public:
-	using addr_t = uint64_t;
-	using heat_t = bool;
-  	using dist_t = heat_t *;
+	
 private:
   
 	UserBlkDev *ubd;
 	PFMonitor *pfm;
-	MemBWDist mbd;
+	MemBWDist *mbd;
 	bool run_out_mapped_page;
 
 	uint64_t page_size;
@@ -31,14 +29,16 @@ private:
 
 	// char *shared_mem;
 
-	addr_t *shared_mem_start;
+	char *shared_mem_start;
 
-	addr_t *shared_mem_start_end;
+	char *shared_mem_start_end;
 
-	addr_t* get_avaible_page()
-	void notify_page_fault(addr_t *addr);
-	addr_t* evict_a_page(addr_t start, addr_t end);
-	int map_new_page_from_blkdev(addr_t *addr);
+	
+	PFMonitor::Callback notify_page_fault(PFMonitor::addr_t addr);
+	PFMonitor::addr_t get_avaible_page();
+	
+	PFMonitor::addr_t evict_a_page(PFMonitor::addr_t start, PFMonitor::addr_t end);
+	int map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr);
 
 	
 public:

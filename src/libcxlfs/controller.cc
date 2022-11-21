@@ -6,7 +6,7 @@
  * @brief  Controller to deal with page fault
  */
 
-#pragma once
+
 #include <functional>
 
 #include "libcxlfs/controller.hh"
@@ -17,8 +17,9 @@
 
 using nvsl::RCast;
 
-addr_t* Controller::get_avaible_page() {
-    auto page_addr = RCast<uint64_t *>(((shared_mem_start >> 12) + page_use) << 12);
+PFMonitor::addr_t Controller::get_avaible_page() {
+    const auto shared_mem_start_npt = RCast<uint64_t>(shared_mem_start);
+    const auto page_addr = ((shared_mem_start_npt >> 12) + page_use) << 12;
     
     page_use +=1;
 
@@ -29,15 +30,15 @@ addr_t* Controller::get_avaible_page() {
     return page_addr;
 }
 
-addr_t* Controller::evict_a_page(addr_t *start_addr, addr_t *end_addr) {
-    auto start = RCast<uint64_t>(start);
-    auto end = RCast<uint64_t>(end);
+PFMonitor::addr_t Controller::evict_a_page(PFMonitor::addr_t start_addr, PFMonitor::addr_t end_addr) {
+    // const auto start = RCast<uint64_t>(start);
+    // const auto end = RCast<uint64_t>(end);
     
-    auto dist = mbd->get_dist(start, end);
+    const auto dist = mbd->get_dist(start_addr, end_addr);
     
-    addr_t target_page;
+    PFMonitor::addr_t target_page;
 
-    for(uint64_t  i = 0; i < sizeof(dist)/sizeof(heat_t); i++){
+    for(uint64_t  i = 0; i < page_count; i++){
         if(dist[i]){
             target_page = i;
             break;
@@ -46,43 +47,49 @@ addr_t* Controller::evict_a_page(addr_t *start_addr, addr_t *end_addr) {
 
     auto addr = target_page << 12;
 
-    return RCast<uint64_t *>addr;
+    return addr;
 }
 
-
-void Controller::notify_page_fault(addr_t addr) {
-
-    if(!run_out_mapped_page) {
-        page_addr = evict_a_page(shared_mem_start, shared_mem_start_end);
-        map_new_page_from_blkdev((void *)addr, page_addr);
+PFMonitor::Callback Controller::notify_page_fault(PFMonitor::addr_t addr, std::bind(&PFMonitor::Callback)) {
+     if(run_out_mapped_page) {
+        const auto page_addr = evict_a_page(RCast<uint64_t>(shared_mem_start), RCast<uint64_t>(shared_mem_start_end));
+        map_new_page_from_blkdev(addr, page_addr);
     } else {
-        page_addr = get_avaible_page();
-        map_new_page_from_blkdev((void *)addr, page_addr);
+        const auto page_addr = get_avaible_page();
+        map_new_page_from_blkdev(addr, page_addr);
     }
+
+    return nullptr;
+
 }
 
 
-int Controller::map_new_page_from_blkdev(addr_t *pf_addr, addr_t *map_addr) {
 
-    char *buf = malloc(page_size);
+int Controller::map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr) {
 
-    auto addr_page = (pf_addr >> 12) << 12;
+    char *buf = RCast<char *>(malloc(page_size));
+
+  
     auto start_lba = (pf_addr >> 12) * 8;
+
 
     ubd->read_blocking(buf, start_lba, 8);
 
-    memcpy(map_addr, buf, page_size);
+    const auto map_addr_pt = RCast<uint64_t*>(map_addr);
+    memcpy(map_addr_pt, buf, page_size);
     return 1;
 
 
 }
 
 
+
+
 /** @brief Initialize the internal state **/
 int Controller::init(){
     ubd = new UserBlkDev;
-    pfm = new pfmonitor;
-    mbd = new membwdist;
+    pfm = new PFMonitor;
+    mbd = new MemBWDist;
 
     ubd->init();
     pfm->init();
@@ -93,12 +100,22 @@ int Controller::init(){
     page_count = 1000;
     page_use = 0;
 
-    shared_mem_start = malloc(page_size * page_count);
+    shared_mem_start = RCast<char*>(malloc(page_size * page_count));
+
     shared_mem_start_end = page_size * page_count + shared_mem_start;
 
-    pfm->register_range(shared_mem_start, shared_mem_start_end);
+
+
+
+
+    pfm->register_range(RCast<uint64_t*>(shared_mem_start), page_size * page_count);
+
+    
+   
+    
 
     pfm->monitor(notify_page_fault);
 
+    return 1;
 
 }
