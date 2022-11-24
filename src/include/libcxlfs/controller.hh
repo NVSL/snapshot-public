@@ -45,5 +45,8 @@ public:
   Controller() {}
   /** @brief Initialize the internal state **/
   int init();
+  char* getSharedMemAddr();
+  uint64_t getSharedMemSize();
+
 
 };
