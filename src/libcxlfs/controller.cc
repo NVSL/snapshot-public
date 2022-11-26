@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "libcxlfs/controller.hh"
+#include <pthread.h>
 
 #include "nvsl/common.hh"
 #include "nvsl/stats.hh"
@@ -84,7 +85,21 @@ int Controller::map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::a
 }
 
 
+void Controller::monitor_thread(){
+    PFMonitor::Callback notify_page_fault = [&](PFMonitor::addr_t addr) {
+        
+        if(run_out_mapped_page) {
+            const auto page_addr = evict_a_page(RCast<uint64_t>(RCast<char *>(shared_mem_start)), RCast<uint64_t>(shared_mem_start_end));
+            map_new_page_from_blkdev(addr, page_addr);
+        } else {
+            const auto page_addr = get_avaible_page();
+            map_new_page_from_blkdev(addr, page_addr);
+        }
 
+    };
+    pfm->monitor(notify_page_fault);
+    return;
+}
 
 /** @brief Initialize the internal state **/
 int Controller::init(){
@@ -101,44 +116,57 @@ int Controller::init(){
     page_count = 1000;
     page_use = 0;
 
-    // RCast<char *>(shared_mem_start) = RCast<char*>(malloc(page_size * page_count));
-
-    const auto temp = RCast<char *>(mmap(nullptr, page_size*page_count, PROT_READ | PROT_WRITE,
-         MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+    // shared_mem_start = RCast<char*>(malloc(page_size * page_count));
+    void *temp = mmap((void*)0x5000, page_size*page_count, PROT_READ | PROT_WRITE,
+         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
     
+
+    if(temp == MAP_FAILED){
+        DBGE << "map failed \n";
+        DBGE << PSTR();
+        exit(1);
+    }
+    // shared_mem_start = RCast<char *>(mmap(nullptr, page_size*page_count, PROT_READ | PROT_WRITE,
+    //      MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+
+    
+    
     shared_mem_start = RCast<char *>(temp);
+
+    *shared_mem_start = 0xd;
     
     // RCast<char *>(shared_mem_start)_end = page_size * page_count + RCast<char *>(shared_mem_start);
     
     
-
-
-
-    pfm->register_range(RCast<uint64_t*>(RCast<char *>(shared_mem_start)), page_size * page_count);
-   
-    PFMonitor::Callback notify_page_fault = [&](PFMonitor::addr_t addr) {
-        if(run_out_mapped_page) {
-            const auto page_addr = evict_a_page(RCast<uint64_t>(RCast<char *>(shared_mem_start)), RCast<uint64_t>(shared_mem_start_end));
-            map_new_page_from_blkdev(addr, page_addr);
-        } else {
-            const auto page_addr = get_avaible_page();
-            map_new_page_from_blkdev(addr, page_addr);
-        }
-
-  };
-    
-   
     
 
-    pfm->monitor(notify_page_fault);
+    const auto rc = pfm->register_range(RCast<uint64_t*>(shared_mem_start), page_size * page_count);
+    if (rc != 0) {
+        perror("pfm->register_range");
+    }
 
+    pthread_t thr;
+
+    // auto wrapper = [&](void *arg){
+    //     static_cast<void *>(arg)->monitor_thread();
+    // };
+    
+    pthread_create(&thr, nullptr, &Controller::monitor_thread_wrapper, nullptr);
+    
+    
+
+    
+    
+
+    
+    
     return 1;
 
 }
 
 char* Controller::getSharedMemAddr() {
-    return RCast<char *>(shared_mem_start);
+    return shared_mem_start;
 }
 
 uint64_t Controller::getSharedMemSize() {

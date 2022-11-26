@@ -7,6 +7,7 @@
  */
 #pragma once
 #include <functional>
+#include <pthread.h>
 
 #include "libcxlfs/pfmonitor.hh"
 #include "libcxlfs/membwdist.hh"
@@ -33,10 +34,16 @@ private:
 
 	char *shared_mem_start_end;
 
+	static void* monitor_thread_wrapper(void* arg)
+    {
+        reinterpret_cast<Controller *>(arg)->monitor_thread();
+        return 0;
+    }
+
 	
 	PFMonitor::Callback notify_page_fault(PFMonitor::addr_t addr);
 	PFMonitor::addr_t get_avaible_page();
-	
+	void monitor_thread();
 	PFMonitor::addr_t evict_a_page(PFMonitor::addr_t start, PFMonitor::addr_t end);
 	int map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr);
 

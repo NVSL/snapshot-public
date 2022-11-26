@@ -16,39 +16,50 @@
 #include "nvsl/common.hh"
 #include "nvsl/utils.hh"
 
+using nvsl::RCast;
+
 Controller *ctlor;
 char *test_page_ctr;
 
 void *fault_page_ctl(void *args) {
   char *addr = nvsl::RCast<char *>(args);
+  
   *addr = 0xf;
+  
 
 	
 
   return nullptr;
 }
 
-void *init_test(void *){
-	return nullptr;
-}
+
 
 TEST(init_test, controller) {
 	ctlor = new Controller();
-  ctlor->init();
+  
 
+  
+
+  ctlor->init();
+  
 	test_page_ctr = ctlor->getSharedMemAddr();
+  
+  
+
+  
 }
 
 
 
 TEST(fault_page_ctl, controller) {
-  // pthread_t thr_ctr;
 
-  // pthread_create(&thr_ctr, nullptr, init_test, nullptr);
-	
+  
+
   fault_page_ctl(test_page_ctr);
 	
-  ASSERT_NE(*test_page_ctr, 0xf);
+  
+	
+  ASSERT_EQ(*test_page_ctr, 0xf);
 }
 
 
