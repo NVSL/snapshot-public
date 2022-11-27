@@ -34,10 +34,11 @@ private:
 
 	char *shared_mem_start_end;
 
-	static void* monitor_thread_wrapper(void* arg)
+	static void* monitor_thread_wrapper(void *obj)
     {
-        reinterpret_cast<Controller *>(arg)->monitor_thread();
-        return 0;
+        reinterpret_cast<Controller *>(obj)->monitor_thread();
+		return 0;
+        
     }
 
 	
@@ -46,6 +47,7 @@ private:
 	void monitor_thread();
 	PFMonitor::addr_t evict_a_page(PFMonitor::addr_t start, PFMonitor::addr_t end);
 	int map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr);
+	
 
 	
 public:
@@ -54,6 +56,8 @@ public:
   int init();
   char* getSharedMemAddr();
   uint64_t getSharedMemSize();
+  void write_to_ubd(void *buf, char* addr);
+  void read_from_ubd(void *buf, char* addr);
 
 
 };

@@ -78,26 +78,54 @@ int Controller::map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::a
     ubd->read_blocking(buf, start_lba, 8);
 
     const auto map_addr_pt = RCast<uint64_t*>(map_addr);
-    memcpy(map_addr_pt, buf, page_size);
+    DBGH(2) << map_addr_pt << " "<< pf_addr << "\n";
+    memcpy((void *)map_addr_pt, buf, page_size);
+    
     return 1;
 
 
-}
+} 
 
 
 void Controller::monitor_thread(){
     PFMonitor::Callback notify_page_fault = [&](PFMonitor::addr_t addr) {
+        DBGH(2) << "Replacing page" << RCast<uint64_t>(addr) << "\n";
         
         if(run_out_mapped_page) {
+            DBGH(2) << "Replacing page: start evit" << RCast<uint64_t>(addr) << "\n";
             const auto page_addr = evict_a_page(RCast<uint64_t>(RCast<char *>(shared_mem_start)), RCast<uint64_t>(shared_mem_start_end));
             map_new_page_from_blkdev(addr, page_addr);
         } else {
+            DBGH(2) << "Replacing page: not ran out of page" << RCast<uint64_t>(addr) << "\n";
             const auto page_addr = get_avaible_page();
             map_new_page_from_blkdev(addr, page_addr);
         }
 
+        DBGH(2) << "Replacing page Done" << RCast<uint64_t>(addr) << "\n";
     };
     pfm->monitor(notify_page_fault);
+    return;
+}
+
+void Controller::write_to_ubd(void *buf, char* addr){
+
+    const auto addr_page = (RCast<uint64_t>(addr) >> 12) << 12;
+    const auto start_lba = addr_page * 8;
+
+    DBGH(2) << "Write to " << RCast<uint64_t>(addr) << "\n";
+
+    ubd->write_blocking(buf, start_lba, 8);
+    return;
+}
+
+void Controller::read_from_ubd(void *buf, char* addr){
+
+    const auto addr_page = (RCast<uint64_t>(addr) >> 12) << 12;
+    const auto start_lba = addr_page * 8;
+
+    DBGH(2) << "Read from " << RCast<uint64_t>(addr) << "\n";
+
+    ubd->read_blocking(buf, start_lba, 8);
     return;
 }
 
@@ -134,7 +162,7 @@ int Controller::init(){
     
     shared_mem_start = RCast<char *>(temp);
 
-    *shared_mem_start = 0xd;
+    // *shared_mem_start = 0xd;
     
     // RCast<char *>(shared_mem_start)_end = page_size * page_count + RCast<char *>(shared_mem_start);
     
@@ -152,7 +180,7 @@ int Controller::init(){
     //     static_cast<void *>(arg)->monitor_thread();
     // };
     
-    pthread_create(&thr, nullptr, &Controller::monitor_thread_wrapper, nullptr);
+    pthread_create(&thr, nullptr, &Controller::monitor_thread_wrapper, this);
     
     
 
