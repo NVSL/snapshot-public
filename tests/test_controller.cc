@@ -23,58 +23,37 @@ char *test_page_ctr;
 
 void *fault_page_ctl(void *args) {
   char *addr = nvsl::RCast<char *>(args);
-  
-  *addr = 0xf;
-  
 
-	
+  *addr = 0xf;
 
   return nullptr;
 }
 
-
-
 TEST(init_test, controller) {
-	ctlor = new Controller();
-  
-
-  
+  ctlor = new Controller();
 
   ctlor->init();
-  
-	test_page_ctr = ctlor->getSharedMemAddr();
-  
-  
 
-  
+  test_page_ctr = ctlor->getSharedMemAddr();
 }
 
 TEST(write_and_read, controller) {
   char *buf = (char *)malloc(4096);
+  memset(buf, 0, 0x1000);
   *buf = 0xa;
-  
+
   ctlor->write_to_ubd(buf, test_page_ctr);
 
   char *buf2 = (char *)malloc(4096);
+  memset(buf2, 0, 0x1000);
   ctlor->read_from_ubd(buf2, test_page_ctr);
 
   ASSERT_EQ(memcmp(buf2, buf, 0x1000), 0);
 }
 
-
-
-
 TEST(fault_page_ctl, controller) {
 
-  
-
   fault_page_ctl(test_page_ctr);
-	
-  
-	
-  // ASSERT_EQ(*test_page_ctr, 0xf);
+
+  ASSERT_EQ(*test_page_ctr, 0xf);
 }
-
-
-
-
