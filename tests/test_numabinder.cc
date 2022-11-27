@@ -24,7 +24,7 @@ using nvsl::RCast;
 
 NumaBinder *nb;
 
-TEST(init, numabinder) {
+TEST(numabinder, init) {
   int rc = -1;
 
   nb = new NumaBinder;
@@ -49,7 +49,7 @@ TEST(init, numabinder) {
   ASSERT_EQ(sched_getcpu(), 4);
 }
 
-TEST(numa_node, numabinder) {
+TEST(numabinder, numa_node) {
 
   nb->bind_to_node(0);
 

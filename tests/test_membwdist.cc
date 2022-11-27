@@ -44,7 +44,7 @@ std::pair<uint64_t, uint64_t> access_mem() {
   return std::make_pair(RCast<uint64_t>(large_arr), large_arr_end);
 }
 
-TEST(init, membwdist) {
+TEST(membwdist, init) {
   int rc;
 
   mbd = new MemBWDist();
@@ -53,7 +53,7 @@ TEST(init, membwdist) {
   ASSERT_EQ(rc, 0);
 }
 
-TEST(access_and_sample, membwdist) {
+TEST(membwdist, access_and_sample) {
   const auto [start, end] = access_mem();
   DBGH(0) << "pages: " << ((end - start) >> 12) << "\n";
   const auto dist = mbd->get_dist(start, end);

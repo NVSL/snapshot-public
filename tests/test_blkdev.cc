@@ -16,19 +16,19 @@
 
 UserBlkDev *ubd;
 
-TEST(init, blkdev) {
+TEST(blkdev, init) {
   ubd = new UserBlkDev();
   ASSERT_TRUE(ubd->init() == 0);
 }
 
-TEST(read_0, blkdev) {
+TEST(blkdev, read_0) {
   char *buf = (char *)malloc(0x1000);
   int rc = ubd->read_blocking(buf, 0, 1);
 
   ASSERT_NE(rc, -1);
 }
 
-TEST(write_and_read_0, blkdev) {
+TEST(blkdev, write_and_read_0) {
   char *ref_buf, *buf;
   int rc = 0;
 

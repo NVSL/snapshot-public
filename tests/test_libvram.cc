@@ -13,7 +13,7 @@
 #include "libvram/libvram.hh"
 #include "nvsl/utils.hh"
 
-TEST(memcheck, libvram) {
+TEST(libvram, memcheck) {
   constexpr size_t BUF_SZ = 1UL * 1024 * 1024 * 1024;
   char *buf_bptr = (char *)nvsl::libvram::malloc(BUF_SZ);
 

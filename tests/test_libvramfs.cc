@@ -15,7 +15,7 @@
 
 constexpr size_t MIN_ALLOC_SZ = 2UL * 1024 * 1024;
 
-TEST(memcheck, libvramfs) {
+TEST(libvramfs, memcheck) {
   int fd = nvsl::libvramfs::open("/mnt/pmem0/a", O_CREAT | O_RDWR);
   ASSERT_TRUE(fd != -1);
 
@@ -35,7 +35,7 @@ TEST(memcheck, libvramfs) {
   memset(addr, 0, MIN_ALLOC_SZ);
 }
 
-TEST(openmultiple, libvramfs) {
+TEST(libvramfs, openmultiple) {
   int fd_b = nvsl::libvramfs::open("/mnt/pmem0/b", O_CREAT | O_RDWR);
   int fd_c = nvsl::libvramfs::open("/mnt/pmem0/c", O_CREAT | O_RDWR);
 

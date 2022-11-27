@@ -43,12 +43,12 @@ void *monitor_thread(void *) {
   return nullptr;
 }
 
-TEST(init, pfmonitor) {
+TEST(pfmonitor, init) {
   pfm = new PFMonitor();
   pfm->init();
 }
 
-TEST(register_range, pfmonitor) {
+TEST(pfmonitor, register_range) {
   void *raw_addr = mmap(nullptr, 0x1000, PROT_READ | PROT_WRITE,
                         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
@@ -67,7 +67,7 @@ TEST(register_range, pfmonitor) {
   ASSERT_EQ(rc, 0);
 }
 
-TEST(fault_page, pfmonitor) {
+TEST(pfmonitor, fault_page) {
   pthread_t thr;
 
   pthread_create(&thr, nullptr, monitor_thread, nullptr);
