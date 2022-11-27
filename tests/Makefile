@@ -18,7 +18,8 @@ GTEST_DIR=../vendor/googletest/googletest
 USER_DIR=.
 
 LIBPUDDLES_CXXFLAGS:=-iquote../src/include -iquote../vendor/cpp-common/include/ -std=c++20 $(shell PKG_CONFIG_PATH=$(CXLBUF_PKG_CONFIG_PATH) pkg-config --cflags spdk_nvme spdk_env_dpdk libisal spdk_vmd)
-LIBPUDDLES_LDFLAGS:=-L$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)vendor/spdk/dpdk/build/lib -Wl,-R$(ROOT_DIR)vendor/spdk/build/lib -lvram -lvramfs -lcxlfs
+LIBPUDDLES_LDFLAGS:=-L$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)lib/ -Wl,-R$(ROOT_DIR)vendor/spdk/dpdk/build/lib -Wl,-R$(ROOT_DIR)vendor/spdk/build/lib
+LIBPUDDLES_LDFLAGS +=  -lvram -lvramfs -lcxlfs -lnuma
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that

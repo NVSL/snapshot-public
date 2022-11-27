@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <numa.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <tuple>
@@ -46,4 +47,27 @@ TEST(init, numabinder) {
   ASSERT_NE(rc, -1);
 
   ASSERT_EQ(sched_getcpu(), 4);
+}
+
+TEST(numa_node, numabinder) {
+
+  nb->bind_to_node(0);
+
+  if (numa_available() != -1) {
+    const auto tgt_node = numa_max_node();
+    std::cerr << "tgt_node = " << tgt_node << std::endl;
+
+    if (tgt_node > 0) {
+      /* We have at least two NUMA nodes */
+
+      ASSERT_NE(NumaBinder::get_cur_numa_node(), tgt_node);
+
+      nb->bind_to_node(tgt_node);
+
+      ASSERT_EQ(NumaBinder::get_cur_numa_node(), tgt_node);
+    } else {
+      ASSERT_EQ(NumaBinder::get_cur_numa_node(), 0);
+      std::cerr << "Skipping NUMA tests, only one node found" << std::endl;
+    }
+  }
 }

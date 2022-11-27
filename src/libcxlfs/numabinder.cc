@@ -14,6 +14,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <numa.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <utmpx.h>
 
@@ -30,6 +31,15 @@ NumaBinder::node_map_t NumaBinder::get_numa_map() {
     DBGH(4) << "cpuid " << cpuid << " node " << node << std::endl;
     result[cpuid] = node;
   }
+
+  return result;
+}
+
+void *mmap_from_node(void *addr, size_t length, int prot, int flags, int fd,
+                     off_t offset, int node) {
+  void *result = mmap(addr, length, prot, flags, fd, offset);
+
+  numa_tonode_memory(addr, length, node);
 
   return result;
 }
@@ -109,8 +119,13 @@ int NumaBinder::bind_to_free_cpu(int cpu_to_bind /* = -1 */) {
     }
 
     if (cpu_used[cpu_to_bind]) {
-      DBGE << "The CPU core " << cpu_to_bind << " to bind is not free!"
-           << std::endl;
+      if (cpu_to_bind == sched_getcpu()) {
+        DBGH(1) << "Current thread already bound to CPU " << cpu_to_bind
+                << std::endl;
+      } else {
+        DBGE << "The CPU core " << cpu_to_bind << " to bind is not free!"
+             << std::endl;
+      }
       return -1;
     }
 
@@ -142,11 +157,31 @@ int NumaBinder::bind_to_free_cpu(int cpu_to_bind /* = -1 */) {
   return i;
 }
 
-void NumaBinder::bind_to_node(int node_id) {
+int NumaBinder::bind_to_node(int tgt_node) {
+  bool bind_successful = false;
+
   const int cpu = sched_getcpu();
   const int node = numa_node_of_cpu(cpu);
 
-  (void)get_numa_map();
+  const auto numa_map = get_numa_map();
 
   DBGH(1) << "Current cpu " << cpu << " node " << node << std::endl;
+
+  for (const auto &[cpuid, nodeid] : numa_map) {
+    if (nodeid == tgt_node) {
+      if (bind_to_free_cpu(cpuid) == cpuid) {
+        bind_successful = true;
+        break;
+      }
+    }
+  }
+
+  return bind_successful ? tgt_node : -1;
+}
+
+int NumaBinder::get_cur_numa_node() {
+  const auto cpu = sched_getcpu();
+  const auto node = numa_node_of_cpu(cpu);
+
+  return node;
 }

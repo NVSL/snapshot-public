@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <map>
+#include <unistd.h>
 
 class NumaBinder {
 private:
@@ -20,11 +21,12 @@ private:
   constexpr static uint64_t MAX_LINE = 8192;
 
   int cpu_aff = -1;
-  //  int cpu_to_bind = -1;
-
   node_map_t get_numa_map();
 
 public:
-  void bind_to_node(int node_id);
+  int bind_to_node(int node_id);
+  void mmap_from_node(void *addr, size_t length, int prot, int flags, int fd,
+                      off_t offset, int node);
   int bind_to_free_cpu(int cpu_to_bind = -1);
+  static int get_cur_numa_node();
 };
