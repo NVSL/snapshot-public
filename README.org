@@ -41,7 +41,18 @@ To run tests:
   make tests
 #+end_src
 
+
+** Configure Linux
+#+begin_src shell
+  echo 0 | sudo tee /proc/sys/kernel/kptr_restrict > /dev/null
+  echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+  echo 1 | sudo tee /proc/sys/vm/unprivileged_userfaultfd
+  echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+#+end_src
+
+
 ** Example environment for compilation
+
 #+begin_src shell
 export LLVM_DIR=/usr/lib/llvm-13/ DCLANG_LIBS_DIR="/home/smahar/git/cxlbuf-emul/lib" NVSL_LOG_LEVEL=4 LD_LIBS_DIR=/home/smahar/git/cxlbuf/lib/
 #+end_src
