@@ -85,7 +85,7 @@ int PFMonitor::monitor_fd_blocking(int fd, Callback &cb) {
         perror("ioctl/wake");
         exit(1);
       } else {
-        std::cerr << "fault handled\n";
+        DBGH(3) << "fault handled\n";
       }
     }
   }

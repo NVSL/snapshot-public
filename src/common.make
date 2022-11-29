@@ -8,7 +8,7 @@ include $(SELF_DIR)colors.make
 CONFIG_FILE ?= $(SELF_DIR)../make.config
 
 ifdef RELEASE
-CXXFLAGS    :=-std=gnu++20 -ggdb3 -O3 -g3 -march=native -fPIC -Wall -DNDEBUG
+CXXFLAGS    :=-std=gnu++20 -ggdb3 -O1 -g3 -march=native -fPIC -Wall -DNDEBUG
 CXXFLAGS    +=-fomit-frame-pointer
 else
 CXXFLAGS    :=-std=gnu++20 -ggdb3 -O0 -fPIC -Wall

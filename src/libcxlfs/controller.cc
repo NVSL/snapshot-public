@@ -47,7 +47,10 @@ int Controller::evict_a_page() {
   if (target_page_idx == (addr_t)-1) {
     DBGH(1) << "Unable to find a page to evict from the distribution\n";
 
-    target_page_idx = mapped_pages[rand() % mapped_pages.size()];
+    auto mp_iter = mapped_pages.begin();
+    std::advance(mp_iter, rand() % mapped_pages.size());
+
+    target_page_idx = (*mp_iter).first;
 
     DBGH(1) << "Using random page " << target_page_idx << std::endl;
   }
@@ -56,15 +59,7 @@ int Controller::evict_a_page() {
 
   DBGH(3) << "Removing page from the mapped page list" << std::endl;
 
-  auto del_idx =
-      std::find(mapped_pages.begin(), mapped_pages.end(), target_page_idx);
-  if (del_idx != mapped_pages.end()) {
-    mapped_pages.erase(del_idx);
-  } else {
-    DBGE << "Unable to find the page to evict in mapped pages\n";
-    return -1;
-  }
-
+  mapped_pages.erase(target_page_idx);
   used_pages--;
 
   return 0;
@@ -80,7 +75,9 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
 
   DBGH(3) << "Getting lba " << start_lba << std::endl;
 
+  blk_rd_clk.tick();
   ubd->read_blocking(buf, start_lba, 8);
+  blk_rd_clk.tock();
 
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flag = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
@@ -99,7 +96,7 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
   memcpy((void *)pf_addr, buf, page_size);
 
   DBGH(3) << "Adding the page to the mapped page list" << std::endl;
-  mapped_pages.push_back((pf_addr - RCast<uint64_t>(get_shm())) >> 12);
+  mapped_pages[((pf_addr - RCast<uint64_t>(get_shm())) >> 12)] = true;
 
   return 1;
 }
@@ -165,8 +162,6 @@ int Controller::init() {
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
   shm_size = SHM_PG_CNT * page_size;
   used_pages = 0;
-
-  mapped_pages.reserve(MAX_ACTIVE_PG_CNT);
 
   ubd->init();
   pfm->init();

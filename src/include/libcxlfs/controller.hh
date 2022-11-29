@@ -12,6 +12,7 @@
 #include "libcxlfs/blkdev.hh"
 #include "libcxlfs/membwdist.hh"
 #include "libcxlfs/pfmonitor.hh"
+#include "nvsl/clock.hh"
 
 class Controller {
 public:
@@ -22,12 +23,13 @@ private:
   PFMonitor *pfm;
   MemBWDist *mbd;
 
-  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 2;
-  static constexpr uint64_t SHM_PG_CNT = 16384;
+  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 1024;
+  static constexpr uint64_t SHM_PG_CNT = (64UL * 1024);
 
-  std::vector<addr_t> mapped_pages;
+  nvsl::Clock blk_rd_clk;
 
   uint64_t page_size, shm_size;
+  std::unordered_map<addr_t, bool> mapped_pages;
 
   /** @brief Tracks the pages currently mapped in the SHM **/
   uint64_t used_pages = 0;
