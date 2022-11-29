@@ -249,7 +249,6 @@ void UserBlkDev::cleanup(void) {
     struct ns_entry *ns_entry;
 
     /* Allocate IO Q pairs */
-    DBGH(4) << "first = " << (&g_namespaces)->tqh_first << std::endl;
     TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
       DBGH(3) << "Allocating IO Q-pairs" << std::endl;
       ns_entry->qpair =
@@ -277,7 +276,6 @@ void UserBlkDev::cleanup(void) {
     struct ubd_sequence sequence = {0};
     int rc;
 
-    DBGH(4) << "first = " << (&g_namespaces)->tqh_first << std::endl;
     TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
       sequence.using_cmb_io = 0;
       sequence.buf =
