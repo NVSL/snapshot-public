@@ -22,8 +22,10 @@ private:
   PFMonitor *pfm;
   MemBWDist *mbd;
 
-  static constexpr uint64_t MAX_PAGE_COUNT = 2;
-  static constexpr uint64_t SHM_PAGE_COUNT = 16384;
+  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 2;
+  static constexpr uint64_t SHM_PG_CNT = 16384;
+
+  std::vector<addr_t> mapped_pages;
 
   uint64_t page_size, shm_size;
 
@@ -37,7 +39,7 @@ private:
   PFMonitor::Callback handle_fault(addr_t addr);
   addr_t get_available_page();
 
-  int evict_a_page(addr_t start, addr_t end);
+  int evict_a_page();
   int map_page_from_blkdev(addr_t pf_addr);
 
   static void *monitor_thread_wrapper(void *obj) {
@@ -57,4 +59,5 @@ public:
 
   void *get_shm();
   uint64_t get_shm_len();
+  void *get_shm_end();
 };

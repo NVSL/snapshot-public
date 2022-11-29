@@ -23,25 +23,49 @@ using nvsl::RCast;
 using addr_t = PFMonitor::addr_t;
 
 addr_t Controller::get_available_page() {
-  const auto page_idx = RCast<uint64_t>(rand() % SHM_PAGE_COUNT);
+  const auto page_idx = RCast<uint64_t>(rand() % SHM_PG_CNT);
   const auto addr = (shm_start + (page_idx << 12));
 
   return RCast<addr_t>(addr);
 }
 
-int Controller::evict_a_page(addr_t start_addr, addr_t end_addr) {
-  const auto dist = mbd->get_dist(start_addr, end_addr);
+int Controller::evict_a_page() {
+  const auto rg_start = RCast<addr_t>(get_shm());
+  const auto rg_end = RCast<addr_t>(get_shm_end());
 
-  addr_t target_page = -1;
+  const auto dist = mbd->get_dist(rg_start, rg_end);
 
-  for (uint64_t i = 0; i < SHM_PAGE_COUNT; i++) {
+  addr_t target_page_idx = -1;
+
+  for (uint64_t i = 0; i < SHM_PG_CNT; i++) {
     if (dist[i]) {
-      target_page = i;
+      target_page_idx = i;
       break;
     }
   }
 
-  (void)target_page;
+  if (target_page_idx == (addr_t)-1) {
+    DBGH(1) << "Unable to find a page to evict from the distribution\n";
+
+    target_page_idx = mapped_pages[rand() % mapped_pages.size()];
+
+    DBGH(1) << "Using random page " << target_page_idx << std::endl;
+  }
+
+  DBGH(2) << "Found a page to evict " << target_page_idx << "\n";
+
+  DBGH(3) << "Removing page from the mapped page list" << std::endl;
+
+  auto del_idx =
+      std::find(mapped_pages.begin(), mapped_pages.end(), target_page_idx);
+  if (del_idx != mapped_pages.end()) {
+    mapped_pages.erase(del_idx);
+  } else {
+    DBGE << "Unable to find the page to evict in mapped pages\n";
+    return -1;
+  }
+
+  used_pages--;
 
   return 0;
 }
@@ -49,44 +73,58 @@ int Controller::evict_a_page(addr_t start_addr, addr_t end_addr) {
 int Controller::map_page_from_blkdev(addr_t pf_addr) {
   char *buf = RCast<char *>(malloc(page_size));
 
+  pf_addr = (pf_addr >> 12) << 12;
+
   const auto addr_off = RCast<uint64_t>(pf_addr) - RCast<uint64_t>(shm_start);
   const auto start_lba = (addr_off >> 12) * 8;
+
+  DBGH(3) << "Getting lba " << start_lba << std::endl;
 
   ubd->read_blocking(buf, start_lba, 8);
 
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flag = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 
+  DBGH(4) << nvsl::mmap_to_str((void *)pf_addr, page_size, prot, flag, -1, 0)
+          << "\n";
   void *mmap_addr = mmap((void *)pf_addr, page_size, prot, flag, -1, 0);
 
-  if ((mmap_addr == MAP_FAILED) and (mmap_addr == (void *)pf_addr)) {
-    DBGE << "mmap for handling page fault failed. Reason: " << PSTR()
-         << std::endl;
+  if ((mmap_addr == MAP_FAILED) or (mmap_addr != (void *)pf_addr)) {
+    DBGE << "mmap (res=" << mmap_addr
+         << ") for handling page fault failed. Reason: " << PSTR() << std::endl;
     exit(1);
   }
 
   DBGH(2) << "Memcpying the page from the blkdev to memory\n";
   memcpy((void *)pf_addr, buf, page_size);
 
+  DBGH(3) << "Adding the page to the mapped page list" << std::endl;
+  mapped_pages.push_back((pf_addr - RCast<uint64_t>(get_shm())) >> 12);
+
   return 1;
 }
 
 void Controller::monitor_thread() {
-  PFMonitor::Callback notify_page_fault = [&](PFMonitor::addr_t addr) {
-    NVSL_ASSERT(used_pages <= MAX_PAGE_COUNT,
-                "used_pages exceed MAX_PAGE_COUNT");
+  PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
+    std::stringstream pg_info;
+    pg_info << "used_pages " << used_pages << " max " << MAX_ACTIVE_PG_CNT;
 
-    DBGH(2) << "Replacing page " << RCast<void *>(addr) << "\n";
+    NVSL_ASSERT(used_pages <= MAX_ACTIVE_PG_CNT, pg_info.str());
 
-    if (used_pages == SHM_PAGE_COUNT) {
-      DBGH(2) << "Replacing page: start evict " << RCast<void *>(addr) << "\n";
-      evict_a_page(RCast<uint64_t>(RCast<char *>(shm_start)),
-                   RCast<uint64_t>(shm_end));
+    const auto pg_idx = (addr - RCast<addr_t>(get_shm())) >> 12;
+    const auto addr_p = RCast<void *>(addr);
+
+    DBGH(2) << "Got fault for page idx " << pg_idx << "\n";
+    DBGH(3) << pg_info.str() << std::endl;
+
+    if (used_pages == MAX_ACTIVE_PG_CNT) {
+      DBGH(2) << "Page replacement: start evict " << addr_p << "\n";
+      evict_a_page();
     } else {
-      DBGH(2) << "Replacing page: not ran out of page " << RCast<void *>(addr)
-              << "\n";
+      DBGH(2) << "Page replacement: did not run out of page " << addr_p << "\n";
     }
 
+    used_pages++;
     map_page_from_blkdev(addr);
     DBGH(2) << "Replacing page done " << RCast<void *>(addr) << "\n";
   };
@@ -125,7 +163,10 @@ int Controller::init() {
   mbd = new MemBWDist;
 
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
-  shm_size = MAX_PAGE_COUNT * page_size;
+  shm_size = SHM_PG_CNT * page_size;
+  used_pages = 0;
+
+  mapped_pages.reserve(MAX_ACTIVE_PG_CNT);
 
   ubd->init();
   pfm->init();
@@ -150,7 +191,8 @@ int Controller::init() {
     return -1;
   }
 
-  monitor_thread();
+  pthread_t pf_thread;
+  rc = pthread_create(&pf_thread, nullptr, &monitor_thread_wrapper, this);
 
   if (rc == -1) {
     DBGE << "Unable to monitor for page fault" << std::endl;
@@ -165,5 +207,9 @@ void *Controller::get_shm() {
 }
 
 uint64_t Controller::get_shm_len() {
-  return SHM_PAGE_COUNT << 12;
+  return SHM_PG_CNT << 12;
+}
+
+void *Controller::get_shm_end() {
+  return RCast<char *>(shm_start) + (SHM_PG_CNT << 12);
 }

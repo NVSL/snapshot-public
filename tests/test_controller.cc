@@ -6,6 +6,7 @@
  * @brief  Brief description here
  */
 
+#include "nvsl/clock.hh"
 #include "gtest/gtest.h"
 #include <cstdlib>
 #include <iostream>
@@ -21,12 +22,10 @@ using nvsl::RCast;
 Controller *ctlor;
 char *test_page_ctr;
 
-void *fault_page_ctl(void *args) {
-  char *addr = nvsl::RCast<char *>(args);
+void fault_page_ctl(char *addr, size_t pg_idx) {
+  auto tgt_addr = addr + (pg_idx << 12);
 
-  *addr = 0xf;
-
-  return nullptr;
+  *tgt_addr = 0xf;
 }
 
 TEST(controller, init_test) {
@@ -48,12 +47,18 @@ TEST(controller, write_and_read) {
   memset(buf2, 0, 0x1000);
   ctlor->read_from_ubd(buf2, test_page_ctr);
 
-  ASSERT_EQ(memcmp(buf2, buf, 0x1000), 0);
+  ASSERT_EQ(*buf2, *buf);
 }
 
 TEST(controller, fault_page_ctl) {
+  nvsl::Clock clk;
+  clk.tick();
+  for (int i = 0; i < 4; i++) {
+    fault_page_ctl(test_page_ctr, i);
+  }
+  clk.tock();
 
-  fault_page_ctl(test_page_ctr);
+  std::cerr << "Average page fault time = " << clk.ns() / 4000 << "us \n";
 
   ASSERT_EQ(*test_page_ctr, 0xf);
 }

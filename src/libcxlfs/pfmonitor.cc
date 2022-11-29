@@ -170,5 +170,7 @@ int PFMonitor::init() {
       return error("ioctl(fd, UFFDIO_REGISTER, ...) failed");
     }
 
+    DBGH(2) << "Range registered\n";
+
     return 0;
   }
