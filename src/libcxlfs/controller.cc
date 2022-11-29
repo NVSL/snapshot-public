@@ -6,116 +6,119 @@
  * @brief  Controller to deal with page fault
  */
 
-
 #include <functional>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "libcxlfs/controller.hh"
 
+#include "libcxlfs/pfmonitor.hh"
 #include "nvsl/common.hh"
+#include "nvsl/error.hh"
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
 
 using nvsl::RCast;
+using addr_t = PFMonitor::addr_t;
 
-PFMonitor::addr_t Controller::get_avaible_page() {
-    const auto shared_mem_start_npt = RCast<uint64_t>(shared_mem_start);
-    const auto page_addr = ((shared_mem_start_npt >> 12) + page_use) << 12;
-    
-    page_use +=1;
+addr_t Controller::get_available_page() {
+  const auto page_idx = (RCast<uint64_t>(rand()) % SHM_PAGE_COUNT);
+  const auto addr = (shm_start + (page_idx << 12));
 
-    if(page_use == page_size) {
-        run_out_mapped_page = true;
+  return RCast<addr_t>(addr);
+}
+
+int Controller::evict_a_page(addr_t start_addr, addr_t end_addr) {
+  const auto dist = mbd->get_dist(start_addr, end_addr);
+
+  addr_t target_page = -1;
+
+  for (uint64_t i = 0; i < SHM_PAGE_COUNT; i++) {
+    if (dist[i]) {
+      target_page = i;
+      break;
     }
+  }
 
-    return page_addr;
+  (void)target_page;
+
+  return 0;
 }
 
-PFMonitor::addr_t Controller::evict_a_page(PFMonitor::addr_t start_addr, PFMonitor::addr_t end_addr) {
-    // const auto start = RCast<uint64_t>(start);
-    // const auto end = RCast<uint64_t>(end);
-    
-    const auto dist = mbd->get_dist(start_addr, end_addr);
-    
-    PFMonitor::addr_t target_page;
+PFMonitor::Callback Controller::handle_fault(addr_t addr,
+                                             std::bind(&PFMonitor::Callback)) {
+  NVSL_ASSERT(used_pages <= MAX_PAGE_COUNT, "used_pages exceed MAX_PAGE_COUNT");
 
-    for(uint64_t  i = 0; i < page_count; i++){
-        if(dist[i]){
-            target_page = i;
-            break;
-        }
+  int rc = 0;
+
+  if (used_pages == MAX_PAGE_COUNT) {
+    rc = evict_a_page(RCast<uint64_t>(shm_start), RCast<uint64_t>(shm_end));
+    if (rc == -1) {
+      DBGE << "Page eviction failed while handling fault for address "
+           << (void *)addr << std::endl;
     }
+  }
 
-    auto addr = target_page << 12;
+  /* WARN: Only works in single threaded model, handling multiple page faults
+   * will require locks/atomics */
+  NVSL_ASSERT(used_pages <= MAX_PAGE_COUNT - 1,
+              "used_pages exceed MAX_PAGE_COUNT");
 
-    return addr;
+  map_page_from_blkdev(addr);
+
+  return nullptr;
 }
 
-PFMonitor::Callback Controller::notify_page_fault(PFMonitor::addr_t addr, std::bind(&PFMonitor::Callback)) {
-     if(run_out_mapped_page) {
-        const auto page_addr = evict_a_page(RCast<uint64_t>(shared_mem_start), RCast<uint64_t>(shared_mem_start_end));
-        map_new_page_from_blkdev(addr, page_addr);
-    } else {
-        const auto page_addr = get_avaible_page();
-        map_new_page_from_blkdev(addr, page_addr);
-    }
+int Controller::map_page_from_blkdev(addr_t pf_addr) {
+  char *buf = RCast<char *>(malloc(page_size));
 
-    return nullptr;
+  auto start_lba = (pf_addr >> 12) * 8;
 
+  ubd->read_blocking(buf, start_lba, 8);
+
+  const auto map_addr_pt = RCast<uint64_t *>(pf_addr);
+  memcpy(map_addr_pt, buf, page_size);
+  return 1;
 }
-
-
-
-int Controller::map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr) {
-
-    char *buf = RCast<char *>(malloc(page_size));
-
-  
-    auto start_lba = (pf_addr >> 12) * 8;
-
-
-    ubd->read_blocking(buf, start_lba, 8);
-
-    const auto map_addr_pt = RCast<uint64_t*>(map_addr);
-    memcpy(map_addr_pt, buf, page_size);
-    return 1;
-
-
-}
-
-
-
 
 /** @brief Initialize the internal state **/
-int Controller::init(){
-    ubd = new UserBlkDev;
-    pfm = new PFMonitor;
-    mbd = new MemBWDist;
+int Controller::init() {
+  int rc = 0;
 
-    ubd->init();
-    pfm->init();
+  ubd = new UserBlkDev;
+  pfm = new PFMonitor;
+  mbd = new MemBWDist;
 
-    run_out_mapped_page = false;
-    
-    page_size = 0x1000;
-    page_count = 1000;
-    page_use = 0;
+  page_size = RCast<size_t>(sysconf(_SC_PAGESIZE));
+  shm_size = MAX_PAGE_COUNT * page_size;
 
-    shared_mem_start = RCast<char*>(malloc(page_size * page_count));
+  ubd->init();
+  pfm->init();
 
-    shared_mem_start_end = page_size * page_count + shared_mem_start;
+  const auto prot = PROT_READ | PROT_WRITE;
+  const auto flags = MAP_ANONYMOUS | MAP_PRIVATE;
+  auto shm_addr = mmap(nullptr, shm_size, prot, flags, -1, 0);
 
+  if (shm_addr == MAP_FAILED) {
+    DBGE << "mmap call for allocating shared memory failed" << std::endl;
+    return -1;
+  }
 
+  shm_start = RCast<char *>(shm_addr);
 
+  rc = pfm->register_range(shm_addr, shm_size);
 
+  if (rc == -1) {
+    DBGE << "Failed to register the range for the page fault handler"
+         << std::endl;
+    return -1;
+  }
 
-    pfm->register_range(RCast<uint64_t*>(shared_mem_start), page_size * page_count);
+  rc = pfm->monitor(handle_fault);
+  if (rc == -1) {
+    DBGE << "Unable to monitor for page fault" << std::endl;
+    return -1;
+  }
 
-    
-   
-    
-
-    pfm->monitor(notify_page_fault);
-
-    return 1;
-
+  return 0;
 }

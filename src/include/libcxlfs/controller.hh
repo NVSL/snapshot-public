@@ -8,42 +8,40 @@
 #pragma once
 #include <functional>
 
-#include "libcxlfs/pfmonitor.hh"
-#include "libcxlfs/membwdist.hh"
 #include "libcxlfs/blkdev.hh"
+#include "libcxlfs/membwdist.hh"
+#include "libcxlfs/pfmonitor.hh"
 
 class Controller {
 public:
-	
 private:
-  
-	UserBlkDev *ubd;
-	PFMonitor *pfm;
-	MemBWDist *mbd;
-	bool run_out_mapped_page;
+  using addr_t = PFMonitor::addr_t;
 
-	uint64_t page_size;
-    uint64_t page_count;
-	uint64_t page_use;
-	
+  UserBlkDev *ubd;
+  PFMonitor *pfm;
+  MemBWDist *mbd;
 
-	// char *shared_mem;
+  static constexpr uint64_t MAX_PAGE_COUNT = 2;
+  static constexpr uint64_t SHM_PAGE_COUNT = 16384;
 
-	char *shared_mem_start;
+  size_t page_size, shm_size;
 
-	char *shared_mem_start_end;
+  /** @brief Tracks the pages currently mapped in the SHM **/
+  uint64_t used_pages = 0;
 
-	
-	PFMonitor::Callback notify_page_fault(PFMonitor::addr_t addr);
-	PFMonitor::addr_t get_avaible_page();
-	
-	PFMonitor::addr_t evict_a_page(PFMonitor::addr_t start, PFMonitor::addr_t end);
-	int map_new_page_from_blkdev(PFMonitor::addr_t pf_addr, PFMonitor::addr_t map_addr);
+  char *shm_start;
+  char *shm_end;
 
-	
+  /** @brief Called when the SHM receives a page fault **/
+  PFMonitor::Callback handle_fault(addr_t addr);
+  addr_t get_available_page();
+
+  int evict_a_page(addr_t start, addr_t end);
+  int map_page_from_blkdev(addr_t pf_addr);
+
 public:
   Controller() {}
+
   /** @brief Initialize the internal state **/
   int init();
-
 };

@@ -7,8 +7,21 @@ if [ "$EUID" -eq 0 ]; then
    export SUDO=""
 fi
 
-pip install pyelftools
-
+# Install DEPS
 "${SUDO}" apt update
 "${SUDO}" apt install -y $APT_PKG_LIST
-#"${SUDO}" chsh -s /bin/zsh "${USER}"
+pip install pyelftools
+
+
+# Setup Linux
+cd ~
+wget 'https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.0.10.tar.xz'
+tar xf linux-6.0.10.tar.xz
+cd linux-6.0.10
+cp ~/cxlbuf/src/scripts/.config ./
+
+make -j$(nproc --all)
+sudo make -j$(nproc --all)
+sudo make modules_install -j$(nproc --all)
+sudo make install -j$(nproc --all)
+
