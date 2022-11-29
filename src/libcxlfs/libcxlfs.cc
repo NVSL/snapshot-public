@@ -113,7 +113,7 @@ off_t nvsl::libcxlfs::lseek(int fd, off_t offset, int whence) {
 
   if ((size_t)new_off > fd_desc_e.len) {
     fd_desc_e.len = new_off;
-    fd_desc_e.region = nvsl::libvram::malloc(fd_desc_e.len);
+//    fd_desc_e.region = malloc(fd_desc_e.len);
   }
 
   return new_off;
