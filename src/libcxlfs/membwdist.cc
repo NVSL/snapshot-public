@@ -64,8 +64,8 @@ int MemBWDist::start_sampling(size_t sampling_freq) {
   }
 
   const size_t mmap_size = (BUF_SZ_PG_CNT + 1) * sysconf(_SC_PAGESIZE);
-  auto buf_raw =
-      mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  auto buf_raw = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, fd, 0);
 
   if (buf_raw == MAP_FAILED) {
     DBGE << nvsl::mmap_to_str(nullptr, mmap_size, PROT_READ | PROT_WRITE,

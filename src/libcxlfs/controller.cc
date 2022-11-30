@@ -190,6 +190,7 @@ int Controller::init() {
   shm_size = SHM_PG_CNT * page_size;
   used_pages = 0;
 
+  mbd->start_sampling(10);
   ubd->init();
   pfm->init();
 
