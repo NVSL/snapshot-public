@@ -23,7 +23,7 @@ public:
   using ip_t = uint64_t;
   using record_t = std::pair<ip_t, addr_t>;
   using heat_t = bool;
-  using dist_t = heat_t *;
+  using dist_t = std::unordered_map<addr_t, heat_t>;
 
 private:
   struct pebs_sample_t {

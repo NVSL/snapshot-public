@@ -19,11 +19,21 @@
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
 
+using nvsl::P;
 using nvsl::RCast;
 using addr_t = PFMonitor::addr_t;
 
+static unsigned int g_seed;
+
+// Compute a pseudorandom integer.
+// Output value in range [0, 32767]
+inline int fast_rand(void) {
+  g_seed = (214013 * g_seed + 2531011);
+  return (g_seed >> 16) & 0x7FFF;
+}
+
 addr_t Controller::get_available_page() {
-  const auto page_idx = RCast<uint64_t>(rand() % SHM_PG_CNT);
+  const auto page_idx = RCast<uint64_t>(fast_rand() % SHM_PG_CNT);
   const auto addr = (shm_start + (page_idx << 12));
 
   return RCast<addr_t>(addr);
@@ -37,10 +47,9 @@ int Controller::evict_a_page() {
 
   addr_t target_page_idx = -1;
 
-  for (uint64_t i = 0; i < SHM_PG_CNT; i++) {
-    if (dist[i]) {
-      target_page_idx = i;
-      break;
+  for (const auto [pg_idx, _] : mapped_pages) {
+    if (!dist.contains(pg_idx)) {
+      target_page_idx = pg_idx;
     }
   }
 
@@ -58,6 +67,26 @@ int Controller::evict_a_page() {
   DBGH(2) << "Found a page to evict " << target_page_idx << "\n";
 
   DBGH(3) << "Removing page from the mapped page list" << std::endl;
+  const auto target_page = P(shm_start + (target_page_idx << 12));
+
+  // Write the page to the backing media
+  // TODO: Check if the page is actually dirty
+  ubd->write_blocking(target_page, target_page_idx * 8, page_size >> 9);
+
+  const auto prot = PROT_READ | PROT_WRITE;
+  const auto flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED;
+  auto addr = mmap(target_page, page_size, prot, flags, -1, 0);
+  pfm->register_range(target_page, page_size);
+
+  if (addr == MAP_FAILED) {
+    DBGE << "mmap() for evicted page failed: " << PSTR() << std::endl;
+    return -1;
+  }
+
+  if (addr != target_page) {
+    DBGE << "Unable to remap at the same address" << std::endl;
+    return -1;
+  }
 
   mapped_pages.erase(target_page_idx);
   used_pages--;
@@ -82,8 +111,6 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flag = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 
-  DBGH(4) << nvsl::mmap_to_str((void *)pf_addr, page_size, prot, flag, -1, 0)
-          << "\n";
   void *mmap_addr = mmap((void *)pf_addr, page_size, prot, flag, -1, 0);
 
   if ((mmap_addr == MAP_FAILED) or (mmap_addr != (void *)pf_addr)) {

@@ -123,8 +123,7 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
   const auto start_pg = start >> pg_sz_bits;
   const auto end_pg = end >> pg_sz_bits;
 
-  const size_t range = (end_pg - start_pg);
-  dist_t result = new heat_t[range];
+  dist_t result;
 
   auto &tail = sample_buf->data_tail;
   auto &head = sample_buf->data_head;

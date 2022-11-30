@@ -23,7 +23,7 @@ private:
   PFMonitor *pfm;
   MemBWDist *mbd;
 
-  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 1024;
+  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 2;
   static constexpr uint64_t SHM_PG_CNT = (64UL * 1024);
 
   nvsl::Clock blk_rd_clk;
