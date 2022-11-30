@@ -40,6 +40,8 @@ public:
   };
 
 private:
+  void *read_buf = nullptr;
+
   static void register_ns(struct spdk_nvme_ctrlr *ctrlr,
                           struct spdk_nvme_ns *ns);
   static void io_complete(void *arg, const spdk_nvme_cpl *completion);

@@ -115,8 +115,6 @@ int Controller::evict_a_page() {
 }
 
 int Controller::map_page_from_blkdev(addr_t pf_addr) {
-  char *buf = RCast<char *>(malloc(page_size));
-
   pf_addr = (pf_addr >> 12) << 12;
 
   const auto addr_off = RCast<uint64_t>(pf_addr) - RCast<uint64_t>(shm_start);
@@ -124,13 +122,8 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
 
   DBGH(3) << "Getting lba " << start_lba << std::endl;
 
-  blk_rd_clk.tick();
-  ubd->read_blocking(buf, start_lba, 8);
-  blk_rd_clk.tock();
-
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flag = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
-
   void *mmap_addr = mmap((void *)pf_addr, page_size, prot, flag, -1, 0);
 
   if ((mmap_addr == MAP_FAILED) or (mmap_addr != (void *)pf_addr)) {
@@ -139,8 +132,9 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
     exit(1);
   }
 
-  DBGH(2) << "Memcpying the page from the blkdev to memory\n";
-  memcpy((void *)pf_addr, buf, page_size);
+  blk_rd_clk.tick();
+  ubd->read_blocking(P(pf_addr), start_lba, 8);
+  blk_rd_clk.tock();
 
   DBGH(3) << "Adding the page to the mapped page list" << std::endl;
   mapped_pages[((pf_addr - RCast<uint64_t>(get_shm())) >> 12)] = true;

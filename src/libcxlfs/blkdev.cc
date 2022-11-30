@@ -50,7 +50,7 @@ void UserBlkDev::register_ns(struct spdk_nvme_ctrlr *ctrlr,
   }
 
   entry = new ns_entry;
-  if (entry == NULL) {
+  if (entry == nullptr) {
     perror("ns_entry malloc");
     exit(1);
   }
@@ -279,13 +279,18 @@ int UserBlkDev::read_blocking(void *buf, off_t start_lba, off_t lba_count) {
 
   TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
     sequence.using_cmb_io = 0;
-    sequence.buf = (char *)spdk_zmalloc(
-        lba_count << 9, 0x1000, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
 
-    if (sequence.buf == NULL) {
-      DBGE << "Read buffer allocation failed\n";
-      return -1;
+    if (read_buf == nullptr) {
+      read_buf = (char *)spdk_zmalloc(lba_count << 9, 0x1000, NULL,
+                                      SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+
+      if (read_buf == nullptr) {
+        DBGE << "Read buffer allocation failed\n";
+        return -1;
+      }
     }
+
+    sequence.buf = nvsl::RCast<char *>(read_buf);
 
     sequence.is_completed = 0;
     sequence.ns_entry = ns_entry;
@@ -306,7 +311,6 @@ int UserBlkDev::read_blocking(void *buf, off_t start_lba, off_t lba_count) {
 
     memcpy(buf, sequence.buf, lba_count << 9);
 
-    spdk_free(sequence.buf);
     break;
   }
 
@@ -321,14 +325,15 @@ std::unique_ptr<ubd_sequence> UserBlkDev::write(void *buf, off_t start_lba,
   int rc;
   size_t sz;
 
-  sequence->using_cmb_io = 0;
+  sequence->using_cmb_io = 1;
   sequence->buf = (char *)spdk_nvme_ctrlr_map_cmb(ns_entry->ctrlr, &sz);
-  if (sequence->buf == NULL || (off_t)sz < (lba_count << 9)) {
+  if (sequence->buf == nullptr || (off_t)sz < (lba_count << 9)) {
     sequence->using_cmb_io = 0;
-    sequence->buf = (char *)spdk_zmalloc(
-        lba_count << 9, 0x1000, NULL, SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+    sequence->buf =
+        (char *)spdk_zmalloc(lba_count << 9, 0x1000, nullptr,
+                             SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
   }
-  if (sequence->buf == NULL) {
+  if (sequence->buf == nullptr) {
     DBGE << "Write buffer allocation failed\n";
     return nullptr;
   }
@@ -366,6 +371,8 @@ int UserBlkDev::write_blocking(void *buf, off_t start_lba, off_t lba_count) {
       spdk_nvme_qpair_process_completions(sequence->ns_entry->qpair, 0);
     }
   }
+
+  sequence->free();
 
   return sequence ? 0 : -1;
 }
