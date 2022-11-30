@@ -74,17 +74,17 @@ int PFMonitor::monitor_fd_blocking(int fd, Callback &cb) {
 
     /* handle the page fault */
     if (fault_msg.event & UFFD_EVENT_PAGEFAULT) {
-      struct uffdio_range range = {};
       auto page_aligned = ((uint64_t)place / 4096) * 4096;
-      range.start = page_aligned;
-      range.len = 4096;
 
-      cb(range.start);
+      auto src = cb(page_aligned);
+      struct uffdio_copy copy = {
+          .dst = page_aligned, .src = (uint64_t)src, .len = 4096};
 
-      if (ioctl(fd, UFFDIO_WAKE, &range) == -1) {
+      if (ioctl(fd, UFFDIO_COPY, &copy) == -1) {
         perror("ioctl/wake");
         exit(1);
       } else {
+        free(src);
         DBGH(3) << "fault handled\n";
       }
     }

@@ -14,7 +14,7 @@
 class PFMonitor {
 public:
   using addr_t = uint64_t;
-  using Callback = std::function<void(addr_t)>;
+  using Callback = std::function<void *(addr_t)>;
 
 private:
   int pf_fd = -1;

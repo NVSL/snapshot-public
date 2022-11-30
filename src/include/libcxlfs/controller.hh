@@ -44,7 +44,7 @@ private:
   addr_t get_available_page();
 
   int evict_a_page();
-  int map_page_from_blkdev(addr_t pf_addr);
+  void *map_page_from_blkdev(addr_t pf_addr);
 
   static void *monitor_thread_wrapper(void *obj) {
     reinterpret_cast<Controller *>(obj)->monitor_thread();

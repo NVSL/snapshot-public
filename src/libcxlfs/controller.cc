@@ -114,7 +114,8 @@ int Controller::evict_a_page() {
   return 0;
 }
 
-int Controller::map_page_from_blkdev(addr_t pf_addr) {
+void *Controller::map_page_from_blkdev(addr_t pf_addr) {
+  void *buf = malloc(page_size);
   pf_addr = (pf_addr >> 12) << 12;
 
   const auto addr_off = RCast<uint64_t>(pf_addr) - RCast<uint64_t>(shm_start);
@@ -122,24 +123,14 @@ int Controller::map_page_from_blkdev(addr_t pf_addr) {
 
   DBGH(3) << "Getting lba " << start_lba << std::endl;
 
-  const auto prot = PROT_READ | PROT_WRITE;
-  const auto flag = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
-  void *mmap_addr = mmap((void *)pf_addr, page_size, prot, flag, -1, 0);
-
-  if ((mmap_addr == MAP_FAILED) or (mmap_addr != (void *)pf_addr)) {
-    DBGE << "mmap (res=" << mmap_addr
-         << ") for handling page fault failed. Reason: " << PSTR() << std::endl;
-    exit(1);
-  }
-
   blk_rd_clk.tick();
-  ubd->read_blocking(P(pf_addr), start_lba, 8);
+  ubd->read_blocking(buf, start_lba, 8);
   blk_rd_clk.tock();
 
   DBGH(3) << "Adding the page to the mapped page list" << std::endl;
   mapped_pages[((pf_addr - RCast<uint64_t>(get_shm())) >> 12)] = true;
 
-  return 1;
+  return buf;
 }
 
 void Controller::monitor_thread() {
@@ -163,8 +154,9 @@ void Controller::monitor_thread() {
     }
 
     used_pages++;
-    map_page_from_blkdev(addr);
+    void *buf = map_page_from_blkdev(addr);
     DBGH(2) << "Replacing page done " << RCast<void *>(addr) << "\n";
+    return buf;
   };
   pfm->monitor(notify_page_fault);
   return;

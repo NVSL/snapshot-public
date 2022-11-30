@@ -36,6 +36,8 @@ void *monitor_thread(void *) {
     //   DBGE << "mprotect: " << PSTR() << "\n";
     // }
     DBGH(0) << "Got a page fault for address " << addr << std::endl;
+
+    return nullptr;
   };
 
   pfm->monitor(cb);
