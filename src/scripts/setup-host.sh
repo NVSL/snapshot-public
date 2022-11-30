@@ -13,6 +13,6 @@ echo "Copying stuff to host ${host}"
 
 $ssh_cmd "$host" -t "mkdir /home/${REMOTE_USERNAME}/cxlbuf/"
 
-rsync --exclude='*.o' --exclude='*.a' -avP -e "${ssh_cmd}" "${dir}/../../" "${host}:/home/${REMOTE_USERNAME}/cxlbuf/"
+rsync --exclude='*.o' --exclude='*.a' --exclude='*.so' -avP -e "${ssh_cmd}" "${dir}/../../" "${host}:/home/${REMOTE_USERNAME}/cxlbuf/"
 
 $ssh_cmd "$host" -t "/home/${REMOTE_USERNAME}/cxlbuf/src/scripts/deps.sh"

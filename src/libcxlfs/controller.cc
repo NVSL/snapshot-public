@@ -71,7 +71,27 @@ int Controller::evict_a_page() {
 
   // Write the page to the backing media
   // TODO: Check if the page is actually dirty
-  ubd->write_blocking(target_page, target_page_idx * 8, page_size >> 9);
+  auto ubd_seq = ubd->write(target_page, target_page_idx * 8, page_size >> 9);
+  if (ubd_seq) {
+    ubd_wr_cq.push_back(std::move(ubd_seq));
+    DBGH(4) << "Added a new entry to the write completion queue. New size "
+            << ubd_wr_cq.size() << "\n";
+  } else {
+    DBGE << "Page write back failed\n";
+    return -1;
+  }
+
+  for (auto iter = ubd_wr_cq.size() - 1; iter > 0; iter--) {
+    auto &entry = ubd_wr_cq[iter];
+    if (entry->is_completed) {
+      entry->free();
+      ubd_wr_cq.erase(ubd_wr_cq.begin() + iter);
+      DBGH(4) << "Deleting completed entry from the write completion queue "
+              << iter << "\n";
+    } else {
+      DBGH(4) << "Write request idx " << iter << " not yet done\n";
+    }
+  }
 
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED;

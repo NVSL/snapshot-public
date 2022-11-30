@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <memory>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #include "spdk/stdinc.h"
@@ -27,15 +28,18 @@ class UserBlkDev {
   spdk_nvme_transport_id g_trid = {};
   bool g_vmd = false;
 
-private:
+public:
   struct ubd_sequence {
     struct ns_entry *ns_entry;
     char *buf;
     bool is_write;
     unsigned using_cmb_io;
     int is_completed;
+
+    void free();
   };
 
+private:
   static void register_ns(struct spdk_nvme_ctrlr *ctrlr,
                           struct spdk_nvme_ns *ns);
   static void io_complete(void *arg, const spdk_nvme_cpl *completion);
@@ -64,4 +68,8 @@ public:
 
   /** @brief Blocking write to an LBA **/
   int write_blocking(void *buf, off_t start_lba, off_t lba_count);
+
+  /** @brief Async write to an LBA **/
+  std::unique_ptr<ubd_sequence> write(void *buf, off_t start_lba,
+                                      off_t lba_count);
 };

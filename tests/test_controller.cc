@@ -55,7 +55,7 @@ TEST(controller, fault_page_ctl) {
   nvsl::Clock clk;
   clk.tick();
   auto i = 0UL;
-  for (; i < 4 /*(ctlor->get_shm_len() >> 12)*/; i++) {
+  for (; i < (ctlor->get_shm_len() >> 12); i++) {
     fault_page_ctl(test_page_ctr, i);
   }
   clk.tock();

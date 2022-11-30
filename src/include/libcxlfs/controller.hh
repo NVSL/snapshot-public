@@ -7,6 +7,7 @@
  */
 #pragma once
 #include <functional>
+#include <memory>
 #include <pthread.h>
 
 #include "libcxlfs/blkdev.hh"
@@ -30,6 +31,7 @@ private:
 
   uint64_t page_size, shm_size;
   std::unordered_map<addr_t, bool> mapped_pages;
+  std::vector<std::unique_ptr<UserBlkDev::ubd_sequence>> ubd_wr_cq;
 
   /** @brief Tracks the pages currently mapped in the SHM **/
   uint64_t used_pages = 0;
