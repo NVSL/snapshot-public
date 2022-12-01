@@ -9,23 +9,16 @@
 #pragma once
 
 #include <memory>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#include "spdk/stdinc.h"
 
-#include "spdk/env.h"
-#include "spdk/log.h"
-#include "spdk/nvme.h"
-#include "spdk/nvme_zns.h"
-#include "spdk/string.h"
-#include "spdk/vmd.h"
-#pragma GCC diagnostic pop
+struct spdk_nvme_transport_id;
+struct spdk_nvme_cpl;
+struct spdk_nvme_ctrlr_opts;
 
 /**
  * @brief Userspace read/write access to NVMe devices
  */
 class UserBlkDev {
-  spdk_nvme_transport_id g_trid = {};
+  spdk_nvme_transport_id *g_trid;
   bool g_vmd = false;
 
 public:
@@ -69,9 +62,9 @@ public:
   int read_blocking(void *buf, off_t start_lba, off_t lba_count);
 
   /** @brief Blocking write to an LBA **/
-  int write_blocking(void *buf, off_t start_lba, off_t lba_count);
+  int write_blocking(const void *buf, off_t start_lba, off_t lba_count);
 
   /** @brief Async write to an LBA **/
-  std::unique_ptr<ubd_sequence> write(void *buf, off_t start_lba,
+  std::unique_ptr<ubd_sequence> write(const void *buf, off_t start_lba,
                                       off_t lba_count);
 };

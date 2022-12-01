@@ -126,7 +126,7 @@ void *memcpy(void *__restrict dst, const void *__restrict src,
   assert(real_memcpy != nullptr);
 
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
-    tls_log.log_range(dst, n);
+    local_log.log_range(dst, n);
   }
 
   return real_memcpy(dst, src, n);
@@ -139,7 +139,7 @@ void *memmove(void *__restrict dst, const void *__restrict src,
   assert(real_memmove != nullptr);
 
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
-    tls_log.log_range(dst, n);
+    local_log.log_range(dst, n);
     memmove_logged = true;
   }
 
@@ -155,7 +155,7 @@ void *memset(void *s, int c, size_t n) {
 
   if (addr_in_range(s) || addr_in_range((char *)s + n)) {
     if (startTracking) {
-      tls_log.log_range(s, n);
+      local_log.log_range(s, n);
     }
   }
 

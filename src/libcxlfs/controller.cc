@@ -33,7 +33,7 @@ inline int fast_rand(void) {
 }
 
 addr_t Controller::get_available_page() {
-  const auto page_idx = RCast<uint64_t>(fast_rand() % SHM_PG_CNT);
+  const auto page_idx = RCast<uint64_t>(fast_rand() % shm_pg_cnt);
   const auto addr = (shm_start + (page_idx << 12));
 
   return RCast<addr_t>(addr);
@@ -136,9 +136,9 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 void Controller::monitor_thread() {
   PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
     std::stringstream pg_info;
-    pg_info << "used_pages " << used_pages << " max " << MAX_ACTIVE_PG_CNT;
+    pg_info << "used_pages " << used_pages << " max " << max_active_pg_cnt;
 
-    NVSL_ASSERT(used_pages <= MAX_ACTIVE_PG_CNT, pg_info.str());
+    NVSL_ASSERT(used_pages <= max_active_pg_cnt, pg_info.str());
 
     const auto pg_idx = (addr - RCast<addr_t>(get_shm())) >> 12;
     const auto addr_p = RCast<void *>(addr);
@@ -146,12 +146,14 @@ void Controller::monitor_thread() {
     DBGH(2) << "Got fault for page idx " << pg_idx << "\n";
     DBGH(3) << pg_info.str() << std::endl;
 
-    if (used_pages == MAX_ACTIVE_PG_CNT) {
+    if (used_pages == max_active_pg_cnt) {
       DBGH(2) << "Page replacement: start evict " << addr_p << "\n";
       evict_a_page();
     } else {
       DBGH(2) << "Page replacement: did not run out of page " << addr_p << "\n";
     }
+
+    faults++;
 
     used_pages++;
     void *buf = map_page_from_blkdev(addr);
@@ -184,21 +186,40 @@ void Controller::read_from_ubd(void *buf, char *addr) {
   return;
 }
 
-/** @brief Initialize the internal state **/
-int Controller::init() {
-  int rc = 0;
+void Controller::flush_cache() {
+  for (const auto [page_idx, _] : mapped_pages) {
+    const auto page_addr = shm_start + (page_idx << 12);
+    ubd->write_blocking(P(page_addr), page_idx * 8, 8);
+  }
 
+  mapped_pages.clear();
+  init(max_active_pg_cnt, shm_pg_cnt);
+}
+
+Controller::Controller() {
   ubd = new UserBlkDev;
   pfm = new PFMonitor;
   mbd = new MemBWDist;
 
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
-  shm_size = SHM_PG_CNT * page_size;
-  used_pages = 0;
 
   mbd->start_sampling(10);
   ubd->init();
   pfm->init();
+}
+
+/** @brief Initialize the internal state **/
+int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
+                     std::size_t shm_pg_cnt /* = (64 * 1024UL) */) {
+  int rc = 0;
+
+  this->max_active_pg_cnt = max_active_pg_cnt;
+  this->shm_pg_cnt = shm_pg_cnt;
+
+  this->faults.reset();
+
+  shm_size = shm_pg_cnt * page_size;
+  used_pages = 0;
 
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flags = MAP_ANONYMOUS | MAP_PRIVATE;
@@ -220,12 +241,16 @@ int Controller::init() {
     return -1;
   }
 
-  pthread_t pf_thread;
-  rc = pthread_create(&pf_thread, nullptr, &monitor_thread_wrapper, this);
+  if (not monitor_thread_running) {
+    pthread_t pf_thread;
+    rc = pthread_create(&pf_thread, nullptr, &monitor_thread_wrapper, this);
 
-  if (rc == -1) {
-    DBGE << "Unable to monitor for page fault" << std::endl;
-    return -1;
+    if (rc == -1) {
+      DBGE << "Unable to monitor for page fault" << std::endl;
+      return -1;
+    }
+
+    monitor_thread_running = true;
   }
 
   return 0;
@@ -236,9 +261,9 @@ void *Controller::get_shm() {
 }
 
 uint64_t Controller::get_shm_len() {
-  return SHM_PG_CNT << 12;
+  return shm_pg_cnt << 12;
 }
 
 void *Controller::get_shm_end() {
-  return RCast<char *>(shm_start) + (SHM_PG_CNT << 12);
+  return RCast<char *>(shm_start) + (shm_pg_cnt << 12);
 }

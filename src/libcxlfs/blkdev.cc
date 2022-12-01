@@ -6,10 +6,17 @@
  * @brief  Brief description here
  */
 
-/*   SPDX-License-Identifier: BSD-3-Clause
- *   Copyright (c) Intel Corporation.
- *   All rights reserved.
- */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#include "spdk/stdinc.h"
+
+#include "spdk/env.h"
+#include "spdk/log.h"
+#include "spdk/nvme.h"
+#include "spdk/nvme_zns.h"
+#include "spdk/string.h"
+#include "spdk/vmd.h"
+#pragma GCC diagnostic pop
 
 #include <functional>
 #include <memory>
@@ -225,8 +232,11 @@ int UserBlkDev::init() {
     return 1;
   }
 
-  spdk_nvme_trid_populate_transport(&g_trid, SPDK_NVME_TRANSPORT_PCIE);
-  snprintf(g_trid.subnqn, sizeof(g_trid.subnqn), "%s", SPDK_NVMF_DISCOVERY_NQN);
+  g_trid = new spdk_nvme_transport_id;
+
+  spdk_nvme_trid_populate_transport(g_trid, SPDK_NVME_TRANSPORT_PCIE);
+  snprintf(g_trid->subnqn, sizeof(g_trid->subnqn), "%s",
+           SPDK_NVMF_DISCOVERY_NQN);
 
   DBGH(2) << "Initializing NVMe Controllers\n";
 
@@ -235,7 +245,7 @@ int UserBlkDev::init() {
             "unavailable.\n";
   }
 
-  rc = spdk_nvme_probe(&g_trid, NULL, probe_cb, attach_cb, NULL);
+  rc = spdk_nvme_probe(g_trid, NULL, probe_cb, attach_cb, NULL);
   if (rc != 0) {
     DBGE << "spdk_nvme_probe() failed\n";
     rc = 1;
@@ -317,8 +327,8 @@ int UserBlkDev::read_blocking(void *buf, off_t start_lba, off_t lba_count) {
   return (sequence.is_completed == 1) ? 0 : -1;
 }
 
-std::unique_ptr<ubd_sequence> UserBlkDev::write(void *buf, off_t start_lba,
-                                                off_t lba_count) {
+std::unique_ptr<ubd_sequence>
+UserBlkDev::write(const void *buf, off_t start_lba, off_t lba_count) {
   struct ns_entry *ns_entry = TAILQ_FIRST(&g_namespaces);
   auto sequence = std::make_unique<struct ubd_sequence>();
 
@@ -363,7 +373,8 @@ std::unique_ptr<ubd_sequence> UserBlkDev::write(void *buf, off_t start_lba,
 }
 
 /** @brief Blocking write to an LBA **/
-int UserBlkDev::write_blocking(void *buf, off_t start_lba, off_t lba_count) {
+int UserBlkDev::write_blocking(const void *buf, off_t start_lba,
+                               off_t lba_count) {
   auto sequence = this->write(buf, start_lba, lba_count);
 
   if (sequence) {

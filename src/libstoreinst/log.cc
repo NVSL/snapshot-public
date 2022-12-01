@@ -236,8 +236,8 @@ void nvsl::cxlbuf::cxlbuf_reg_tls_log() {
     tls_logs = new std::vector<nvsl::cxlbuf::Log *>;
   }
 
-  tls_logs->push_back(&tls_log);
+  tls_logs->push_back(&local_log);
 }
 
-thread_local nvsl::cxlbuf::Log thread_local_log;
+thread_local nvsl::cxlbuf::Log local_log;
 std::vector<nvsl::cxlbuf::Log *> *tls_logs = nullptr;

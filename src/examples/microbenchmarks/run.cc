@@ -25,6 +25,8 @@ int main(int argc, char *argv[]) {
                      std::function<void(void)>(mb_clwbsfencedist)),
       std::make_pair("msyncscaling",
                      std::function<void(void)>(mb_msyncscaling)),
+      std::make_pair("workingsetsize",
+                     std::function<void(void)>(mb_workingsetsize)),
   };
 
   for (int i = 1; i < argc; i++) {

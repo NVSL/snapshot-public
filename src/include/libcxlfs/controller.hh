@@ -14,18 +14,21 @@
 #include "libcxlfs/membwdist.hh"
 #include "libcxlfs/pfmonitor.hh"
 #include "nvsl/clock.hh"
+#include "nvsl/stats.hh"
 
 class Controller {
 public:
+  nvsl::Counter faults;
+
 private:
   using addr_t = PFMonitor::addr_t;
 
-  UserBlkDev *ubd;
-  PFMonitor *pfm;
-  MemBWDist *mbd;
+  std::size_t max_active_pg_cnt = 2;
+  std::size_t shm_pg_cnt = (64 * 1024UL);
 
-  static constexpr uint64_t MAX_ACTIVE_PG_CNT = 2;
-  static constexpr uint64_t SHM_PG_CNT = (64UL * 1024);
+  UserBlkDev *ubd = nullptr;
+  PFMonitor *pfm = nullptr;
+  MemBWDist *mbd = nullptr;
 
   nvsl::Clock blk_rd_clk;
 
@@ -38,6 +41,8 @@ private:
 
   char *shm_start;
   char *shm_end;
+
+  bool monitor_thread_running = false;
 
   /** @brief Called when the SHM receives a page fault **/
   PFMonitor::Callback handle_fault(addr_t addr);
@@ -52,16 +57,19 @@ private:
   }
 
   void monitor_thread();
-
-public:
-  Controller() {}
-
-  /** @brief Initialize the internal state **/
-  int init();
   void write_to_ubd(void *buf, char *addr);
   void read_from_ubd(void *buf, char *addr);
+
+public:
+  Controller();
+
+  /** @brief Initialize the internal state **/
+  int init(std::size_t max_active_pg_cnt = 2,
+           std::size_t shm_pg_cnt = (64 * 1024UL));
 
   void *get_shm();
   uint64_t get_shm_len();
   void *get_shm_end();
+
+  void flush_cache();
 };

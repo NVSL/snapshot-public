@@ -155,7 +155,7 @@ __attribute__((unused)) void checkMemory(void *ptr) {
 
   if (startTracking) {
     if (start_addr <= ptr and ptr < end_addr) {
-      tls_log.log_range(ptr, 8);
+      local_log.log_range(ptr, 8);
 #ifndef RELEASE
       if (get_env_val(ENABLE_CHECK_MEMORY_TRACING_ENV)) {
         *traceStream << "-----\n" << nvsl::get_stack_trace() << "\n\n";

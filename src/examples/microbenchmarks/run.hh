@@ -11,3 +11,4 @@
 void mb_clwbsfencedist();
 void mb_clwbvsntstore();
 void mb_msyncscaling();
+void mb_workingsetsize();
