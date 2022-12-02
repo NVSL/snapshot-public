@@ -12,7 +12,7 @@ DEPENDS := $(wildcard ../include/* ./*.hh ./*/*.hh)
 EXTRA_LDFLAGS := -L$(LIB_DIR) -Wl,-R$(LIB_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-Wl,--whole-archive $(ARCHIVE_DEPENDS) \
 	-Wl,--no-whole-archive
-EXTRA_LINKFLAGS +=-luuid -pthread -lvram
+EXTRA_LINKFLAGS +=-luuid -pthread -lvram -lcxlfs
 TARGET := libstoreinst
 
 include ../common.make

@@ -12,6 +12,7 @@
 
 #include "libcxlfs/blkdev.hh"
 #include "libcxlfs/membwdist.hh"
+#include "libcxlfs/numabinder.hh"
 #include "libcxlfs/pfmonitor.hh"
 #include "nvsl/clock.hh"
 #include "nvsl/stats.hh"
@@ -23,12 +24,15 @@ public:
 private:
   using addr_t = PFMonitor::addr_t;
 
+  static constexpr size_t REMOTE_NODE = 0;
+
   std::size_t max_active_pg_cnt = 2;
   std::size_t shm_pg_cnt = (64 * 1024UL);
 
   UserBlkDev *ubd = nullptr;
   PFMonitor *pfm = nullptr;
   MemBWDist *mbd = nullptr;
+  NumaBinder *nbd = nullptr;
 
   nvsl::Clock blk_rd_clk;
 

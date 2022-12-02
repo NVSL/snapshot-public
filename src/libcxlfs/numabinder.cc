@@ -14,6 +14,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <numa.h>
+#include <numaif.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <utmpx.h>
@@ -184,4 +185,18 @@ int NumaBinder::get_cur_numa_node() {
   const auto node = numa_node_of_cpu(cpu);
 
   return node;
+}
+
+int NumaBinder::move_range(void *addr, size_t len, int dest_node) {
+  void **pages = new void *[1];
+  int *nodes = new int[1];
+  int *status = new int[1];
+  int flags = MPOL_MF_MOVE_ALL;
+
+  pages[0] = addr;
+  nodes[0] = dest_node;
+
+  numa_move_pages(0, len >> 12, pages, nodes, status, flags);
+
+  return status[0];
 }

@@ -7,6 +7,7 @@
  */
 
 #include "libc_wrappers.hh"
+#include "libcxlfs/libcxlfs.hh"
 #include "libstoreinst.hh"
 #include "libvram/libvram.hh"
 #include "log.hh"
@@ -201,8 +202,11 @@ std::string cxlbuf::PmemFile::get_dependency_fname() const {
 
 bool cxlbuf::PmemFile::has_backing_file() {
   const auto bfile = fs::path(this->get_backing_fname());
-  DBGH(3) << "Checking if backing file " << bfile << " exists" << std::endl;
-  return std::filesystem::is_regular_file(bfile);
+  const auto result = std::filesystem::is_regular_file(bfile);
+
+  DBGH(3) << "Checking if backing file " << bfile << " exists: " << result
+          << std::endl;
+  return result;
 }
 
 void cxlbuf::PmemFile::create_backing_file_internal() {
@@ -216,10 +220,11 @@ void cxlbuf::PmemFile::create_backing_file_internal() {
   if (fs::file_size(this->path) == 0) {
     DBGH(2) << "Creating backing file by allocating " << this->len << " bytes"
             << std::endl;
-    
+
     int fd = open(bfname.c_str(), O_CREAT | O_RDWR, 0666);
     if (fd == -1) {
-      DBGE << "Unable to open file descriptor for the backing file" << std::endl;
+      DBGE << "Unable to open file descriptor for the backing file"
+           << std::endl;
       DBGE << PSTR();
       exit(1);
     }
@@ -232,8 +237,13 @@ void cxlbuf::PmemFile::create_backing_file_internal() {
     DBGH(3) << "New backing file size: "
             << fs::file_size(this->get_backing_fname()) << std::endl;
   } else {
+    DBGH(4) << "File " << this->path
+            << " has non-zero size: " << fs::file_size(this->path) << "\n";
     DBGH(2) << "Creating backing file of size by copying...";
-    fs::copy_file(this->path, bfname);
+    if (not fs::copy_file(this->path, bfname)) {
+      DBGE << "Unable to copy file\n";
+      exit(1);
+    }
     DBG << "done" << std::endl;
   }
 }
@@ -279,6 +289,8 @@ void cxlbuf::PmemFile::map_backing_file() {
   /* Since this file is opened in the PM, create a corresponding backing file
      and map it at +0x10000000000 */
   void *bck_addr = (char *)this->addr + 0x10000000000;
+
+  DBGH(4) << "Opening backing file " << bfname << std::endl;
   const int bck_fd = open(bfname.c_str(), O_RDWR);
 
   if (bck_fd == -1) {
@@ -297,16 +309,25 @@ void cxlbuf::PmemFile::map_backing_file() {
           << std::endl;
   void *mbck_addr = MAP_FAILED;
 
-  if (is_prefix("/mnt/cxl0", this->get_backing_fname())) {
+  const bool oncxl = is_prefix("/mnt/cxl0", this->get_backing_fname());
+  const bool onmss = is_prefix("/mnt/mss0", this->get_backing_fname());
+
+  if (oncxl or onmss) {
     void *tmp_addr = real_mmap(nullptr, this->len, PROT_READ | PROT_WRITE,
                                MAP_PRIVATE, bck_fd, 0);
     if (tmp_addr == MAP_FAILED) {
-      DBGE << "Unable to map cxl0 file" << std::endl;
+      DBGE << "Unable to map cxl0/mss0 file" << std::endl;
       DBGE << PSTR() << "\n";
       exit(1);
     }
 
-    mbck_addr = nvsl::libvram::malloc(this->len);
+    if (oncxl) {
+      mbck_addr = nvsl::libvram::malloc(this->len);
+    } else if (onmss) {
+      mbck_addr = nvsl::libcxlfs::malloc(this->len);
+    } else {
+      DBGE << "Neither cxl, nor mss\n";
+    }
 
     /* Set the backing_file_start to let the logging mechanism copy content into
        the backing file on snapshot() */
@@ -410,7 +431,8 @@ void *cxlbuf::PmemFile::map_to_page_cache(int flags, int prot, int fd,
      PMEM */
   if (cxlModeEnabled) {
     const auto fpath = fd_to_fname(fd);
-    if (not fpath.empty() and not nvsl::is_prefix("/mnt/pmem0/", fpath)) {
+    if (not fpath.empty() and not nvsl::is_prefix("/mnt/pmem0/", fpath) and
+        not nvsl::is_prefix("/mnt/mss0/", fpath)) {
       DBGE << "Unable to map non pmem file to page cache\n";
       exit(1);
     }

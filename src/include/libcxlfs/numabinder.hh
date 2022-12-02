@@ -29,4 +29,6 @@ public:
                       off_t offset, int node);
   int bind_to_free_cpu(int cpu_to_bind = -1);
   static int get_cur_numa_node();
+
+  static int move_range(void *addr, size_t len, int dest_node);
 };

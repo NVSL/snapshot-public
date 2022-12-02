@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cstddef>
+
 namespace nvsl {
   namespace libcxlfs {
+    void *malloc(size_t bytes);
+
     /**
      * @brief Open a file on vram
      * @param[in] pathname Path of the file to open

@@ -51,7 +51,7 @@ libcxlfs:
 	$(PUDDLES_LN) -fs $(basename $(patsubst ../bin/%, ../src/storeinst-pass/%, $@)) $@
 
 clean: libpmbuffer_clean libdsaemu_clean examples_clean storeinst-pass_clean \
-	scripts_clean libstoreinst_clean libpmdkemul_clean
+	scripts_clean libstoreinst_clean libpmdkemul_clean libcxlfs_clean libvram_clean libvramfs_clean
 	rm "$(SELF_DIR).make.tmp"
 
 %_clean:

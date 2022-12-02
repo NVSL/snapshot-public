@@ -134,6 +134,7 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 }
 
 void Controller::monitor_thread() {
+  nbd->bind_to_node(1);
   PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
     std::stringstream pg_info;
     pg_info << "used_pages " << used_pages << " max " << max_active_pg_cnt;
@@ -157,6 +158,7 @@ void Controller::monitor_thread() {
 
     used_pages++;
     void *buf = map_page_from_blkdev(addr);
+
     DBGH(2) << "Replacing page done " << RCast<void *>(addr) << "\n";
     return buf;
   };
@@ -200,12 +202,13 @@ Controller::Controller() {
   ubd = new UserBlkDev;
   pfm = new PFMonitor;
   mbd = new MemBWDist;
+  nbd = new NumaBinder();
 
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
 
   mbd->start_sampling(10);
   ubd->init();
-  pfm->init();
+  pfm->init(REMOTE_NODE);
 }
 
 /** @brief Initialize the internal state **/
@@ -221,6 +224,8 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   shm_size = shm_pg_cnt * page_size;
   used_pages = 0;
 
+  nbd->bind_to_node(REMOTE_NODE);
+
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flags = MAP_ANONYMOUS | MAP_PRIVATE;
   auto shm_addr = mmap(nullptr, shm_size, prot, flags, -1, 0);
@@ -230,6 +235,8 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
     DBGE << PSTR() << std::endl;
     return -1;
   }
+
+  nbd->bind_to_node(0);
 
   shm_start = RCast<char *>(shm_addr);
 

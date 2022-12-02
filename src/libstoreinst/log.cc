@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "bgflush.hh"
+#include "libcxlfs/libcxlfs.hh"
 #include "libvram/libvram.hh"
 #include "log.hh"
 #include "nvsl/clock.hh"
@@ -203,7 +204,9 @@ void nvsl::cxlbuf::Log::init_thread_buf() {
     exit(1);
   }
 
-  if (is_prefix("/mnt/cxl0/", *log_loc)) {
+  if (is_prefix("/mnt/mss0/", *log_loc)) {
+    log_area = RCast<log_layout_t *>(nvsl::libcxlfs::malloc(BUF_SIZE));
+  } else if (is_prefix("/mnt/cxl0/", *log_loc)) {
     log_area = RCast<log_layout_t *>(nvsl::libvram::malloc(BUF_SIZE));
   } else {
     log_area = RCast<log_layout_t *>(

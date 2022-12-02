@@ -176,8 +176,9 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   std::cerr << "cxlModeEnabled = " << cxlModeEnabled << "\n";
 
   // Check if the mmaped file is in /mnt/pmem0/
-  if (cxlModeEnabled and (is_prefix("/mnt/pmem0/", fd_fname) or
-                          is_prefix("/mnt/cxl0", fd_fname))) {
+  if (cxlModeEnabled and
+      (is_prefix("/mnt/pmem0/", fd_fname) or is_prefix("/mnt/cxl0", fd_fname) or
+       is_prefix("/mnt/mss0", fd_fname))) {
     if (cxlbuf::mmap_start == nullptr) {
       cxlbuf::mmap_start = start_addr;
     }

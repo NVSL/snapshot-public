@@ -13,8 +13,10 @@
 #include <sys/mman.h>
 #include <vector>
 
+#include "libcxlfs/controller.hh"
 #include "libcxlfs/libcxlfs.hh"
 #include "nvsl/common.hh"
+#include "nvsl/constants.hh"
 #include "nvsl/utils.hh"
 
 using namespace nvsl;
@@ -23,7 +25,11 @@ using namespace nvsl::libcxlfs;
 typedef std::string cxlfs_path_t;
 typedef int cxlfs_fd_t;
 
-constexpr size_t DEF_ALLOC_SIZE = 4UL * 1024 * 1024 * 1024;
+static Controller *ctrlr;
+static size_t bump_off = 0;
+
+constexpr size_t MEM_SIZE = 32UL * nvsl::LP_SZ::GiB;
+constexpr size_t CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
 
 struct fd_desc_t {
   int fd;             //< file descriptor identifier
@@ -49,6 +55,19 @@ struct fd_desc_t {
 std::unordered_map<cxlfs_path_t, cxlfs_fd_t> path_to_fd;
 std::unordered_map<cxlfs_fd_t, cxlfs_path_t> fd_to_path;
 std::unordered_map<cxlfs_fd_t, fd_desc_t> fd_desc;
+
+void *nvsl::libcxlfs::malloc(size_t bytes) {
+  std::cerr << __FUNCTION__ << "()\n";
+  if (not ctrlr) {
+    ctrlr = new Controller();
+    ctrlr->init(CACHE_SIZE >> 12, MEM_SIZE >> 12);
+  }
+
+  void *result = (char *)ctrlr->get_shm() + bump_off;
+  bump_off += bytes;
+
+  return result;
+}
 
 int get_free_fd() {
   int result = 1;
@@ -113,7 +132,7 @@ off_t nvsl::libcxlfs::lseek(int fd, off_t offset, int whence) {
 
   if ((size_t)new_off > fd_desc_e.len) {
     fd_desc_e.len = new_off;
-//    fd_desc_e.region = malloc(fd_desc_e.len);
+    fd_desc_e.region = nvsl::libcxlfs::malloc(fd_desc_e.len);
   }
 
   return new_off;
@@ -122,6 +141,8 @@ off_t nvsl::libcxlfs::lseek(int fd, off_t offset, int whence) {
 int nvsl::libcxlfs::open(const char *pathname, int flags) {
   const auto pathname_str = std::string(pathname);
   int result = -1;
+
+  DBGH(4) << "Redir: Opening " << pathname << ", flags: " << flags << "\n";
 
   if (path_to_fd.find(pathname) != path_to_fd.end()) {
     result = path_to_fd[pathname_str];

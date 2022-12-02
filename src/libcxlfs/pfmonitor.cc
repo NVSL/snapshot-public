@@ -6,18 +6,23 @@
  * @brief  Pointers page fault for the current process
  */
 
+#include <cstring>
 #include <functional>
 #include <iostream>
 
 #include <linux/userfaultfd.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#include "libcxlfs/numabinder.hh"
 #include "libcxlfs/pfmonitor.hh"
 #include "nvsl/common.hh"
 #include "nvsl/error.hh"
+
+using nvsl::P;
 
 int userfaultfd(int flags) {
   return syscall(SYS_userfaultfd, flags);
@@ -69,18 +74,28 @@ int PFMonitor::monitor_fd_blocking(int fd, Callback &cb) {
       return error("ioctl_userfaultfd read");
     }
 
-    char *place = (char *)fault_msg.arg.pagefault.address;
+    const char *place = (char *)fault_msg.arg.pagefault.address;
     DBGH(3) << "Got page fault at " << (void *)(place) << std::endl;
 
     /* handle the page fault */
     if (fault_msg.event & UFFD_EVENT_PAGEFAULT) {
-      auto page_aligned = ((uint64_t)place / 4096) * 4096;
-
+      const auto page_aligned = ((uint64_t)place / 4096) * 4096;
       auto src = cb(page_aligned);
-      struct uffdio_copy copy = {
-          .dst = page_aligned, .src = (uint64_t)src, .len = 4096};
 
-      if (ioctl(fd, UFFDIO_COPY, &copy) == -1) {
+      const struct uffdio_range range = {.start = page_aligned, .len = 0x1000};
+
+      if (P(page_aligned) !=
+          mmap(P(page_aligned), 0x1000, PROT_READ | PROT_WRITE,
+               MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0)) {
+        DBGE << "mmap failed: " << PSTR() << "\n";
+      }
+
+      const int rc = NumaBinder::move_range(src, 0x1000, tgt_node);
+      if (rc < 0) {
+        DBGE << "numabind failed " << strerror(-rc) << std::endl;
+      }
+
+      if (ioctl(fd, UFFDIO_WAKE, &range) == -1) {
         perror("ioctl/wake");
         exit(1);
       } else {
@@ -120,8 +135,9 @@ int PFMonitor::get_pf_fd() {
 }
 
 /** @brief Initialize the internal state **/
-int PFMonitor::init() {
+int PFMonitor::init(int tgt_node /* = 0 */) {
   this->pf_fd = get_pf_fd();
+  this->tgt_node = tgt_node;
 
   return this->pf_fd;
 }

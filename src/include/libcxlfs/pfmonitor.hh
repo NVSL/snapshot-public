@@ -18,6 +18,7 @@ public:
 
 private:
   int pf_fd = -1;
+  int tgt_node = 0;
 
   int error(std::string err_str, bool has_errno = true);
 
@@ -30,8 +31,12 @@ private:
 public:
   PFMonitor() {}
 
-  /** @brief Initialize the internal state **/
-  int init();
+  /**
+   * @brief Initialize the internal state
+   * @param tgt_node[in] Numa node to move pages to on allocation
+   **/
+
+  int init(int tgt_node = 0);
 
   /** @brief Monitor for page faults and handle them using cb **/
   int monitor(Callback cb);

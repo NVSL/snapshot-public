@@ -1,5 +1,5 @@
 .PHONY: simplekv_cxlbuf simplekv_pmdk simplekv_famus btree map map_pmdk	\
-	linkedlist_tx single_write microbenchmarks redirect		\
+	linkedlist_tx linkedlist_cxlfs single_write microbenchmarks redirect		\
 	microbenchmarks_cxlbuf microbenchmarks_famus
 
 SOURCES := $(wildcard *.cc)
@@ -13,7 +13,7 @@ EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
 
 SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk simplekv_famus		\
-	linkedlist_pmdk linkedlist_tx microbenchmarks gpu-microbenchmarks	\
+	linkedlist_pmdk linkedlist_tx linkedlist_cxlfs microbenchmarks gpu-microbenchmarks	\
 	microbenchmarks_cxlbuf microbenchmarks_famus
 
 include ../common.make
@@ -47,7 +47,7 @@ periodic-msync: periodic-msync.o
 	$(PUDDLES_MAKE) -C $(subst _subdir_clean,,$@) clean
 
 
-clean: clean_deps map_subdir_clean $(addsuffix _subdir_clean,$(SUBDIRS))
+clean: clean_deps map_subdir_clean $(addsuffix _subdir_clean,$(SUBDIRS)) btree_subdir_clean
 	-rm -rf *.o dummy cat-demo periodic-msync
 
 include ../deps.make
