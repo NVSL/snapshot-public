@@ -57,5 +57,6 @@ TEST(membwdist, access_and_sample) {
   const auto [start, end] = access_mem();
   DBGH(0) << "pages: " << ((end - start) >> 12) << "\n";
   const auto dist = mbd->get_dist(start, end);
+  DBGH(0) << "dist size = " << dist.size() << "\n";
   (void)dist;
 }

@@ -25,7 +25,7 @@ using namespace nvsl::libcxlfs;
 typedef std::string cxlfs_path_t;
 typedef int cxlfs_fd_t;
 
-static Controller *ctrlr;
+Controller *nvsl::libcxlfs::ctrlr;
 static size_t bump_off = 0;
 
 constexpr size_t MEM_SIZE = 32UL * nvsl::LP_SZ::GiB;
@@ -154,7 +154,7 @@ int nvsl::libcxlfs::open(const char *pathname, int flags) {
 }
 
 void *nvsl::libcxlfs::mmap(void *addr, size_t length, int prot, int flags,
-                            int fd, off_t offset) {
+                           int fd, off_t offset) {
   void *result;
 
   if (not fd_exists(fd)) {
@@ -184,4 +184,8 @@ void *nvsl::libcxlfs::mmap(void *addr, size_t length, int prot, int flags,
   result = RCast<char *>(fd_desc_e.region) + fd_desc_e.va_alloc_off;
 
   return result;
+}
+
+__attribute__((destructor)) void libcxlfs_dtor() {
+  std::cerr << "libcxlfs.faults = " << ctrlr->faults.value() << "\n";
 }

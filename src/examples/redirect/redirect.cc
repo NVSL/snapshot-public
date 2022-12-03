@@ -3,7 +3,7 @@
 /**
  * @file   redirect.cc
  * @date   avril 25, 2022
- * @brief  Brief description here
+ * @brief  Redirects mmap calls after reading its path
  */
 
 #include <dlfcn.h>
@@ -11,6 +11,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include "libcxlfs/libcxlfs.hh"
 #include "libvram/libvram.hh"
 #include "nvsl/error.hh"
 #include "nvsl/utils.hh"
@@ -44,16 +45,29 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
   const std::string fname = nvsl::fd_to_fname(__fd);
   void *result = MAP_FAILED;
 
-  if (nvsl::is_prefix("/mnt/cxl0/", fname)) {
+  const bool tocxl = nvsl::is_prefix("/mnt/cxl0/", fname);
+  const bool tomss = nvsl::is_prefix("/mnt/mss0/", fname);
+
+  if (tocxl or tomss) {
     DBGW << "MMAP intercepted for redirect (fd = " << fname << "): "
          << nvsl::mmap_to_str(__addr, __len, __prot, __flags, __fd, __offset)
          << "\n";
-    DBGW << "Calling nvsl::libvram::malloc(" << (void *)__len << ")\n";
 
     if (mapped_files.find(fname) != mapped_files.end()) {
       result = mapped_files[fname];
     } else {
-      result = nvsl::libvram::malloc(__len);
+      if (tocxl) {
+        DBGW << "Calling nvsl::libvram::malloc(" << (void *)__len << ")\n";
+
+        result = nvsl::libvram::malloc(__len);
+      } else if (tomss) {
+        DBGW << "Calling nvsl::libcxlfs::malloc(" << (void *)__len << ")\n";
+
+        result = nvsl::libcxlfs::malloc(__len);
+      } else {
+        NVSL_ERROR("Unknown device type\n");
+      }
+
       mapped_files[fname] = result;
     }
   } else {

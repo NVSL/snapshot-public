@@ -2,8 +2,12 @@
 
 #include <cstddef>
 
+class Controller;
+
 namespace nvsl {
   namespace libcxlfs {
+    extern Controller *ctrlr;
+
     void *malloc(size_t bytes);
 
     /**

@@ -87,7 +87,9 @@ int PFMonitor::monitor_fd_blocking(int fd, Callback &cb) {
       if (P(page_aligned) !=
           mmap(P(page_aligned), 0x1000, PROT_READ | PROT_WRITE,
                MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0)) {
-        DBGE << "mmap failed: " << PSTR() << "\n";
+        DBGE << "mmap to drop backing page of a mapping failed: " << PSTR()
+             << "\n";
+        sleep(1000);
       }
 
       const int rc = NumaBinder::move_range(src, 0x1000, tgt_node);

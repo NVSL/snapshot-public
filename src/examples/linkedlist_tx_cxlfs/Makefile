@@ -20,12 +20,12 @@ export DCLANG_DONT_LINK = 1
 
 include ../../common.make
 
-all: linkedlist_cxlfs
+all: linkedlist_tx_cxlfs
 
-linkedlist_cxlfs: linkedlist_cxlfs.o
+linkedlist_tx_cxlfs: linkedlist_tx_cxlfs.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
 clean: clean_deps
-	-rm -f *.o linkedlist_cxlfs ../map/map.o
+	-rm -f *.o linkedlist_tx_cxlfs ../map/map.o
 
 include ../../deps.make

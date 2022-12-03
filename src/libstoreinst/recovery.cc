@@ -7,6 +7,7 @@
  */
 
 #include "libc_wrappers.hh"
+#include "libcxlfs/controller.hh"
 #include "libcxlfs/libcxlfs.hh"
 #include "libstoreinst.hh"
 #include "libvram/libvram.hh"
@@ -337,6 +338,11 @@ void cxlbuf::PmemFile::map_backing_file() {
 
     /* Copy the content from the file to the buffer */
     memcpy(mbck_addr, tmp_addr, this->len);
+
+    if (onmss) {
+      std::cerr << "flushing caches" << std::endl;
+      nvsl::libcxlfs::ctrlr->flush_cache();
+    }
 
     /* We no longer need the temporary mapping, the mapping on the GPU will
      * behave as the backing region now */
