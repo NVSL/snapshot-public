@@ -1,6 +1,8 @@
 // -*- mode: c++; c-basic-offset: 2; -*-
 
 #include "libc_wrappers.hh"
+#include "libcxlfs/controller.hh"
+#include "libcxlfs/libcxlfs.hh"
 #include "libstoreinst.hh"
 #include "log.hh"
 #include "nvsl/clock.hh"
@@ -216,6 +218,7 @@ void sync(void) __THROW {
 }
 
 int msync(void *__addr, size_t __len, int __flags) {
+  DBGH(4) << "Intercepted call to " << __FUNCTION__ << "\n";
   return snapshot(__addr, __len, __flags);
 }
 
@@ -274,10 +277,12 @@ int fdatasync(int __fildes) {
 __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   snapshots++;
   if (nopMsync) [[unlikely]] {
+    DBGH(1) << "!!! Nop msync !!!\n";
     return 0;
   }
 
 #if defined(NO_PERSIST_OPS) || defined(NO_CHECK_MEMORY)
+  DBGH(1) << "!!! No persist ops !!!\n";
   return 0;
 #endif
 
@@ -296,6 +301,8 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
     tls_logs = new std::vector<nvsl::cxlbuf::Log *>;
   }
 
+  DBGH(2) << "Found " << tls_logs->size() << " TLS logs\n";
+
   for (auto tls_log_ptr : *tls_logs) {
     auto &tls_log = *tls_log_ptr;
 
@@ -303,6 +310,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
     /* Drain all the stores to the log and update its state before modifying the
        backing file */
+    tls_log.log_area->log_offset = 0;
     tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
 
     if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
@@ -346,6 +354,10 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
             break;
           }
         }
+
+        std::cerr << "resizing cache\n";
+        nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
+        nvsl::libcxlfs::ctrlr->reset_stats();
       }
 
       DBGH(1) << "Calling snapshot (not msync)" << std::endl;
@@ -456,6 +468,8 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
       if (applied_cnt == entry_cnt) {
         tls_log.set_state(cxlbuf::Log::State::EMPTY);
+      } else {
+        DBGW << "Not resetting log state on snapshot()\n";
       }
     } else {
       DBGH(1) << "Calling real msync" << std::endl;

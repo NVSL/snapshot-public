@@ -76,4 +76,6 @@ public:
   void *get_shm_end();
 
   void flush_cache();
+  void resize_cache(size_t pg_cnt);
+  void reset_stats();
 };

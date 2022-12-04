@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nvsl/constants.hh"
 #include <cstddef>
 
 class Controller;
@@ -7,6 +8,10 @@ class Controller;
 namespace nvsl {
   namespace libcxlfs {
     extern Controller *ctrlr;
+
+    constexpr size_t MEM_SIZE = 4UL * nvsl::LP_SZ::GiB;
+    constexpr size_t INIT_CACHE_SIZE = 1 * nvsl::LP_SZ::GiB;
+    constexpr size_t CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
 
     void *malloc(size_t bytes);
 

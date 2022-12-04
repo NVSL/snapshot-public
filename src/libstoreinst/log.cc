@@ -222,6 +222,8 @@ void nvsl::cxlbuf::Log::init_thread_buf() {
   log_area->log_offset = 0;
   log_area->tail_ptr = RCast<uint8_t *>(log_area->content);
 
+  cxlbuf_reg_tls_log();
+
   close(fd);
 }
 
@@ -235,7 +237,7 @@ nvsl::cxlbuf::Log::Log() {
 }
 
 void nvsl::cxlbuf::cxlbuf_reg_tls_log() {
-  if (tls_logs) {
+  if (not tls_logs) {
     tls_logs = new std::vector<nvsl::cxlbuf::Log *>;
   }
 

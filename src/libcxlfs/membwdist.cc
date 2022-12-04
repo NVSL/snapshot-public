@@ -21,6 +21,7 @@
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
 
+using nvsl::P;
 using nvsl::RCast;
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
@@ -59,13 +60,13 @@ int MemBWDist::start_sampling(size_t sampling_freq) {
           << " attr.sample_type " << attr.sample_type << std::endl;
 
   if (fd == -1) {
-    DBGE << "Error opening leader " << (char *)attr.config << std::endl;
+    DBGE << "Error opening perf leader " << (char *)attr.config << std::endl;
     return fd;
   }
 
   const size_t mmap_size = (BUF_SZ_PG_CNT + 1) * sysconf(_SC_PAGESIZE);
-  auto buf_raw = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE,
-                      MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+  auto buf_raw =
+      mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
   if (buf_raw == MAP_FAILED) {
     DBGE << nvsl::mmap_to_str(nullptr, mmap_size, PROT_READ | PROT_WRITE,
@@ -75,6 +76,8 @@ int MemBWDist::start_sampling(size_t sampling_freq) {
   }
 
   this->sample_buf = RCast<perf_event_mmap_page *>(buf_raw);
+
+  close(fd);
 
   return rc;
 }
@@ -104,7 +107,6 @@ std::vector<MemBWDist::record_t> MemBWDist::get_samples() {
       sample_cnt++;
       tail += header->size;
     } else {
-      DBGE << "Unknown packet type" << std::endl;
     }
   }
 
@@ -151,7 +153,7 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
       sample_cnt++;
       tail += header->size;
     } else {
-      DBGE << "Unknown packet type" << std::endl;
+      //      DBGE << "Unknown packet type" << std::endl;
     }
   }
 

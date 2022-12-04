@@ -226,6 +226,14 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
 
   nbd->bind_to_node(REMOTE_NODE);
 
+  if (shm_start) {
+    std::cerr << "Unmapping shm\n";
+    rc = munmap(shm_start, shm_size);
+    if (rc == -1) {
+      DBGE << "Unable to munmap\n";
+    }
+  }
+
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flags = MAP_ANONYMOUS | MAP_PRIVATE;
   auto shm_addr = mmap(nullptr, shm_size, prot, flags, -1, 0);
@@ -261,6 +269,22 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   }
 
   return 0;
+}
+
+void Controller::resize_cache(size_t pg_cnt) {
+  const auto should_flush = pg_cnt < this->max_active_pg_cnt;
+  this->max_active_pg_cnt = pg_cnt;
+
+  if (should_flush) {
+    std::cerr << "Cache size reduced, flushing...\n";
+    this->flush_cache();
+  } else {
+    std::cerr << "Cache size not reduced.\n";
+  }
+}
+
+void Controller::reset_stats() {
+  this->faults.reset();
 }
 
 void *Controller::get_shm() {

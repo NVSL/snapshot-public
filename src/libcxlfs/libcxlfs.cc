@@ -28,9 +28,6 @@ typedef int cxlfs_fd_t;
 Controller *nvsl::libcxlfs::ctrlr;
 static size_t bump_off = 0;
 
-constexpr size_t MEM_SIZE = 32UL * nvsl::LP_SZ::GiB;
-constexpr size_t CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
-
 struct fd_desc_t {
   int fd;             //< file descriptor identifier
   void *region;       //< Start of the region where this file is allocated
@@ -60,7 +57,7 @@ void *nvsl::libcxlfs::malloc(size_t bytes) {
   std::cerr << __FUNCTION__ << "()\n";
   if (not ctrlr) {
     ctrlr = new Controller();
-    ctrlr->init(CACHE_SIZE >> 12, MEM_SIZE >> 12);
+    ctrlr->init(INIT_CACHE_SIZE >> 12, MEM_SIZE >> 12);
   }
 
   void *result = (char *)ctrlr->get_shm() + bump_off;
@@ -187,5 +184,7 @@ void *nvsl::libcxlfs::mmap(void *addr, size_t length, int prot, int flags,
 }
 
 __attribute__((destructor)) void libcxlfs_dtor() {
-  std::cerr << "libcxlfs.faults = " << ctrlr->faults.value() << "\n";
+  if (ctrlr) {
+    std::cerr << "libcxlfs.faults = " << ctrlr->faults.value() << "\n";
+  }
 }

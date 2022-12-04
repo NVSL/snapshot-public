@@ -48,15 +48,15 @@ TEST(membwdist, init) {
   int rc;
 
   mbd = new MemBWDist();
-  rc = mbd->start_sampling(10);
+  rc = mbd->start_sampling(1);
 
   ASSERT_EQ(rc, 0);
 }
 
 TEST(membwdist, access_and_sample) {
+
   const auto [start, end] = access_mem();
   DBGH(0) << "pages: " << ((end - start) >> 12) << "\n";
   const auto dist = mbd->get_dist(start, end);
-  DBGH(0) << "dist size = " << dist.size() << "\n";
-  (void)dist;
+  ASSERT_GT(dist.size(), 1024);
 }
