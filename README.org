@@ -7,6 +7,7 @@
 - nvsl.cpp-common (included)
 - libvulkan-dev
 - libisal-dev
+- LLVM-13
 
 ** Build
 To build the project:
@@ -44,6 +45,7 @@ To run tests:
 
 ** Configure Linux
 #+begin_src shell
+  sudo sysctl -w vm.max_map_count=$((262144*1024))
   echo 0 | sudo tee /proc/sys/kernel/kptr_restrict > /dev/null
   echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
   echo 1 | sudo tee /proc/sys/vm/unprivileged_userfaultfd
