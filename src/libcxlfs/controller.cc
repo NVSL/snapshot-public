@@ -158,6 +158,7 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 void Controller::monitor_thread() {
   nbd->bind_to_node(1);
   PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
+    page_fault_clk.tick();
     std::stringstream pg_info;
     pg_info << "used_pages " << used_pages << " max " << max_active_pg_cnt;
 
@@ -182,6 +183,8 @@ void Controller::monitor_thread() {
     void *buf = map_page_from_blkdev(addr);
 
     DBGH(2) << "Replacing page done " << RCast<void *>(addr) << "\n";
+
+    page_fault_clk.tock();
     return buf;
   };
   pfm->monitor(notify_page_fault);
@@ -310,6 +313,7 @@ void Controller::reset_stats() {
   mbd->get_dist_lat.reset();
   this->page_eviction_clk.reset();
   this->blk_rd_clk.reset();
+  this->page_fault_clk.reset();
 }
 
 void *Controller::get_shm() {
@@ -327,5 +331,6 @@ void *Controller::get_shm_end() {
 std::unordered_map<std::string, nvsl::Clock> Controller::get_clocks() {
   return {{"mbd.get_dist_lat", mbd->get_dist_lat},
           {"blk_rd_clk", blk_rd_clk},
-          {"page_eviction_clk", page_eviction_clk}};
+          {"page_eviction_clk", page_eviction_clk},
+          {"page_fault_clk", page_fault_clk}};
 }

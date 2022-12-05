@@ -54,6 +54,7 @@ void mb_workingsetsize() {
     std::cerr << ", " << ctrl.faults.value() << ", "
               << clks.at("mbd.get_dist_lat").ns_per_event() / 1000 << "us, "
               << clks.at("blk_rd_clk").ns_per_event() / 1000 << "us, "
+              << clks.at("page_fault_clk").ns_per_event() / 1000 << "us, "
               << clks.at("page_eviction_clk").ns_per_event() / 1000 << "us";
     ctrl.flush_cache();
     ctrl.reset_stats();

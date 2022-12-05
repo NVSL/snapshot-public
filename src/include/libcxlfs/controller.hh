@@ -34,7 +34,7 @@ private:
   MemBWDist *mbd = nullptr;
   NumaBinder *nbd = nullptr;
 
-  nvsl::Clock blk_rd_clk, page_eviction_clk;
+  nvsl::Clock blk_rd_clk, page_eviction_clk, page_fault_clk;
 
   uint64_t page_size, shm_size;
   std::unordered_map<addr_t, bool> mapped_pages;
