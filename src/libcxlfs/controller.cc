@@ -19,6 +19,9 @@
 #include "nvsl/error.hh"
 #include "nvsl/stats.hh"
 #include "nvsl/utils.hh"
+#include "nvsl/envvars.hh"
+
+NVSL_DECL_ENV(REMOTE_NODE);
 
 using nvsl::P;
 using nvsl::RCast;
@@ -156,7 +159,7 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 }
 
 void Controller::monitor_thread() {
-  nbd->bind_to_node(1);
+  nbd->bind_to_node(remote_node);
   PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
     page_fault_clk.tick();
     std::stringstream pg_info;
@@ -224,6 +227,10 @@ void Controller::flush_cache() {
 }
 
 Controller::Controller() {
+  this->remote_node = std::stoi(get_env_str(REMOTE_NODE_ENV, "0"));
+
+  std::cerr << "remote node is " << remote_node << "\n";
+
   ubd = new UserBlkDev;
   pfm = new PFMonitor;
   mbd = new MemBWDist;
@@ -233,7 +240,7 @@ Controller::Controller() {
 
   mbd->start_sampling(250);
   ubd->init();
-  pfm->init(REMOTE_NODE);
+  pfm->init(remote_node);
 }
 
 /** @brief Initialize the internal state **/
@@ -249,7 +256,7 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   shm_size = shm_pg_cnt * page_size;
   used_pages = 0;
 
-  nbd->bind_to_node(REMOTE_NODE);
+  nbd->bind_to_node(this->remote_node);
 
   if (shm_start) {
     DBGH(1) << "Unmapping shm\n";

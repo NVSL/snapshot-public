@@ -24,7 +24,7 @@ public:
 private:
   using addr_t = PFMonitor::addr_t;
 
-  static constexpr size_t REMOTE_NODE = 1;
+  size_t remote_node;
 
   std::size_t max_active_pg_cnt = 2;
   std::size_t shm_pg_cnt = (64 * 1024UL);

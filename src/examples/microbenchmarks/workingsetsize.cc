@@ -30,7 +30,7 @@ using namespace nvsl;
 constexpr size_t CACHE_SIZE = 1 * nvsl::MiB;
 constexpr size_t TOTAL_SHM_SIZE = 1 * nvsl::GiB;
 
-constexpr size_t MAX_ACCESSES = 5000;
+constexpr size_t MAX_ACCESSES = 50000;
 constexpr size_t MIN_WRK_SET_SIZE = 1;
 constexpr size_t MAX_WRK_SET_SIZE = TOTAL_SHM_SIZE;
 
