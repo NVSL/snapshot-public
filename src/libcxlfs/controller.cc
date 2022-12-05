@@ -13,6 +13,7 @@
 #include "libcxlfs/controller.hh"
 #include <pthread.h>
 
+#include "libcxlfs/membwdist.hh"
 #include "libcxlfs/pfmonitor.hh"
 #include "nvsl/common.hh"
 #include "nvsl/error.hh"
@@ -23,7 +24,11 @@ using nvsl::P;
 using nvsl::RCast;
 using addr_t = PFMonitor::addr_t;
 
+constexpr size_t MAX_DIST_AGE = 10;
+
 static unsigned int g_seed;
+MemBWDist::dist_t dist;
+size_t dist_age = MAX_DIST_AGE;
 
 // Compute a pseudorandom integer.
 // Output value in range [0, 32767]
@@ -43,7 +48,12 @@ int Controller::evict_a_page() {
   const auto rg_start = RCast<addr_t>(get_shm());
   const auto rg_end = RCast<addr_t>(get_shm_end());
 
-  const auto dist = mbd->get_dist(rg_start, rg_end);
+  if (dist_age == MAX_DIST_AGE) {
+    dist = mbd->get_dist(rg_start, rg_end);
+    dist_age = 0;
+  } else {
+    dist_age++;
+  }
 
   addr_t target_page_idx = -1;
 

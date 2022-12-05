@@ -27,10 +27,10 @@
 
 using namespace nvsl;
 
-constexpr size_t CACHE_SIZE = 128 * nvsl::MiB;
+constexpr size_t CACHE_SIZE = 1 * nvsl::MiB;
 constexpr size_t TOTAL_SHM_SIZE = 1 * nvsl::GiB;
 
-constexpr size_t MAX_ACCESSES = 500000;
+constexpr size_t MAX_ACCESSES = 5000;
 constexpr size_t MIN_WRK_SET_SIZE = 1;
 constexpr size_t MAX_WRK_SET_SIZE = TOTAL_SHM_SIZE;
 
@@ -54,7 +54,7 @@ void mb_workingsetsize() {
     ctrl.flush_cache();
 
     std::random_device rd{};
-    std::mt19937 gen{rd()};
+    std::minstd_rand gen{rd()};
 
     std::normal_distribution<> d{wss / 2.0, std::max(wss / 16.0, 1.0)};
     clk.reset();
