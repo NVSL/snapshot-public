@@ -116,6 +116,8 @@ std::vector<MemBWDist::record_t> MemBWDist::get_samples() {
 }
 
 MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
+  get_dist_lat.tick();
+
   char *samples;
   size_t sample_cnt = 0, useful_samples = 0;
   float useful_samples_pct = 0;
@@ -160,6 +162,8 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
   useful_samples_pct = (useful_samples * 100.0 / (float)sample_cnt);
   DBGH(2) << "Found " << sample_cnt << ", useful: " << useful_samples << " ("
           << useful_samples_pct << "%) samples\n";
+
+  get_dist_lat.tock();
 
   return result;
 }

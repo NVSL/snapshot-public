@@ -24,7 +24,7 @@ public:
 private:
   using addr_t = PFMonitor::addr_t;
 
-  static constexpr size_t REMOTE_NODE = 0;
+  static constexpr size_t REMOTE_NODE = 1;
 
   std::size_t max_active_pg_cnt = 2;
   std::size_t shm_pg_cnt = (64 * 1024UL);
@@ -78,4 +78,5 @@ public:
   void flush_cache();
   void resize_cache(size_t pg_cnt);
   void reset_stats();
+  std::unordered_map<std::string, nvsl::Clock> get_clocks();
 };

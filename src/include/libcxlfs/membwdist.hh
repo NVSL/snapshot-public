@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "nvsl/clock.hh"
+
 class MemBWDist {
 public:
   using addr_t = uint64_t;
@@ -38,6 +40,8 @@ private:
   perf_event_mmap_page *sample_buf;
 
 public:
+  nvsl::Clock get_dist_lat;
+
   MemBWDist() {}
   int start_sampling(size_t sampling_freq);
   std::vector<MemBWDist::record_t> get_samples();

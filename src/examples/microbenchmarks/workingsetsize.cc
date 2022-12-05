@@ -50,8 +50,10 @@ void mb_workingsetsize() {
     std::cerr << wss << ", " << clk.ns() / (MAX_ACCESSES * 1000) << "."
               << std::setw(3) << std::setfill('0')
               << (clk.ns() / MAX_ACCESSES) % 1000 << "us";
-    std::cerr << ", " << ctrl.faults.value();
+    std::cerr << ", " << ctrl.faults.value() << ", "
+              << ctrl.get_clocks()["mbd.get_dist_lat"].ns_per_op(ctrl.faults.value()) / 1000 << "us";
     ctrl.flush_cache();
+    ctrl.reset_stats();
 
     std::random_device rd{};
     std::minstd_rand gen{rd()};
@@ -68,6 +70,7 @@ void mb_workingsetsize() {
 
     std::cerr << ", " << ctrl.faults.value() << "\n";
     ctrl.flush_cache();
+    ctrl.reset_stats();
   }
 
   // /* Generate results */

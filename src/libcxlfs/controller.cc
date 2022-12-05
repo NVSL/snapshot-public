@@ -24,7 +24,7 @@ using nvsl::P;
 using nvsl::RCast;
 using addr_t = PFMonitor::addr_t;
 
-constexpr size_t MAX_DIST_AGE = 10;
+size_t MAX_DIST_AGE = 100;
 
 static unsigned int g_seed;
 MemBWDist::dist_t dist;
@@ -49,7 +49,15 @@ int Controller::evict_a_page() {
   const auto rg_end = RCast<addr_t>(get_shm_end());
 
   if (dist_age == MAX_DIST_AGE) {
+    nvsl::Clock clk;
+    clk.tick();
     dist = mbd->get_dist(rg_start, rg_end);
+    clk.tock();
+
+    if (clk.ns() / 1024 > 1) {
+      MAX_DIST_AGE *= 2;
+    }
+
     dist_age = 0;
   } else {
     dist_age++;
@@ -216,7 +224,7 @@ Controller::Controller() {
 
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
 
-  mbd->start_sampling(10);
+  mbd->start_sampling(250);
   ubd->init();
   pfm->init(REMOTE_NODE);
 }
@@ -307,4 +315,8 @@ uint64_t Controller::get_shm_len() {
 
 void *Controller::get_shm_end() {
   return RCast<char *>(shm_start) + (shm_pg_cnt << 12);
+}
+
+std::unordered_map<std::string, nvsl::Clock> Controller::get_clocks() {
+  return {{"mbd.get_dist_lat", mbd->get_dist_lat}};
 }
