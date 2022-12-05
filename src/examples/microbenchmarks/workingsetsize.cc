@@ -47,11 +47,14 @@ void mb_workingsetsize() {
       shm[rand() % wss] += 1;
     }
     clk.tock();
+    const auto clks = ctrl.get_clocks();
     std::cerr << wss << ", " << clk.ns() / (MAX_ACCESSES * 1000) << "."
               << std::setw(3) << std::setfill('0')
               << (clk.ns() / MAX_ACCESSES) % 1000 << "us";
     std::cerr << ", " << ctrl.faults.value() << ", "
-              << ctrl.get_clocks()["mbd.get_dist_lat"].ns_per_op(ctrl.faults.value()) / 1000 << "us";
+              << clks.at("mbd.get_dist_lat").ns_per_event() / 1000 << "us, "
+              << clks.at("blk_rd_clk").ns_per_event() / 1000 << "us, "
+              << clks.at("page_eviction_clk").ns_per_event() / 1000 << "us";
     ctrl.flush_cache();
     ctrl.reset_stats();
 

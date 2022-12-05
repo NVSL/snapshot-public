@@ -48,6 +48,8 @@ int Controller::evict_a_page() {
   const auto rg_start = RCast<addr_t>(get_shm());
   const auto rg_end = RCast<addr_t>(get_shm_end());
 
+  page_eviction_clk.tick();
+
   if (dist_age == MAX_DIST_AGE) {
     nvsl::Clock clk;
     clk.tick();
@@ -128,6 +130,8 @@ int Controller::evict_a_page() {
 
   mapped_pages.erase(target_page_idx);
   used_pages--;
+
+  page_eviction_clk.tock();
 
   return 0;
 }
@@ -303,6 +307,9 @@ void Controller::resize_cache(size_t pg_cnt) {
 
 void Controller::reset_stats() {
   this->faults.reset();
+  mbd->get_dist_lat.reset();
+  this->page_eviction_clk.reset();
+  this->blk_rd_clk.reset();
 }
 
 void *Controller::get_shm() {
@@ -318,5 +325,7 @@ void *Controller::get_shm_end() {
 }
 
 std::unordered_map<std::string, nvsl::Clock> Controller::get_clocks() {
-  return {{"mbd.get_dist_lat", mbd->get_dist_lat}};
+  return {{"mbd.get_dist_lat", mbd->get_dist_lat},
+          {"blk_rd_clk", blk_rd_clk},
+          {"page_eviction_clk", page_eviction_clk}};
 }
