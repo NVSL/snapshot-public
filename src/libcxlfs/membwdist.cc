@@ -153,6 +153,12 @@ MemBWDist::dist_t MemBWDist::get_dist(addr_t start, addr_t end) {
       }
 
       sample_cnt++;
+
+      if (sample_cnt > MAX_SAMPLES) {
+        tail = head;
+        break;
+      }
+      
       tail += header->size;
     } else {
       //      DBGE << "Unknown packet type" << std::endl;

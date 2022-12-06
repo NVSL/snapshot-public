@@ -35,6 +35,7 @@ private:
   };
 
   constexpr static size_t BUF_SZ_PG_CNT = 0x100;
+  constexpr static size_t MAX_SAMPLES = 0x1000;
 
   /** @brief PEBS sample buffer */
   perf_event_mmap_page *sample_buf;

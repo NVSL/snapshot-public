@@ -27,7 +27,7 @@
 
 using namespace nvsl;
 
-constexpr size_t CACHE_SIZE = 1 * nvsl::MiB;
+constexpr size_t CACHE_SIZE = 128 * nvsl::MiB;
 constexpr size_t TOTAL_SHM_SIZE = 1 * nvsl::GiB;
 
 constexpr size_t MAX_ACCESSES = 50000;
@@ -39,6 +39,8 @@ void mb_workingsetsize() {
   ctrl.init(CACHE_SIZE >> 12, TOTAL_SHM_SIZE >> 12);
 
   char *shm = RCast<char *>(ctrl.get_shm());
+
+  std::cerr << "size, lat, faults, dist_lat, blk_rd_clk, page_fault_clk, page_eviction_clk, size, lat, faults\n";
 
   for (size_t wss = MIN_WRK_SET_SIZE; wss < MAX_WRK_SET_SIZE; wss <<= 1) {
     Clock clk;

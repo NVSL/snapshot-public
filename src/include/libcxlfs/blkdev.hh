@@ -33,6 +33,7 @@ public:
   };
 
 private:
+  static size_t namespace_cnt;
   void *read_buf = nullptr;
 
   static void register_ns(struct spdk_nvme_ctrlr *ctrlr,

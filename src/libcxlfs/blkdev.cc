@@ -183,7 +183,10 @@ void UserBlkDev::attach_cb(void *cb_ctx, const spdk_nvme_transport_id *trid,
       continue;
     }
     register_ns(ctrlr, ns);
+    namespace_cnt++;
   }
+
+  std::cerr << "namespaces = " << namespace_cnt << "\n";
 }
 
 void UserBlkDev::cleanup(void) {
@@ -286,54 +289,71 @@ int UserBlkDev::read_blocking(void *buf, off_t start_lba, off_t lba_count) {
   struct ns_entry *ns_entry;
   struct ubd_sequence sequence = {0};
   int rc;
+  size_t ns_iter = 0;
+  const size_t tgt_ns = start_lba % namespace_cnt;
 
   TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
-    sequence.using_cmb_io = 0;
+    if (ns_iter == tgt_ns) {
+      break;
+    }
+
+    ns_iter++;
+  }
+
+  sequence.using_cmb_io = 0;
+
+  if (read_buf == nullptr) {
+    read_buf = (char *)spdk_zmalloc(lba_count << 9, 0x1000, NULL,
+                                    SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
 
     if (read_buf == nullptr) {
-      read_buf = (char *)spdk_zmalloc(lba_count << 9, 0x1000, NULL,
-                                      SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
-
-      if (read_buf == nullptr) {
-        DBGE << "Read buffer allocation failed\n";
-        return -1;
-      }
+      DBGE << "Read buffer allocation failed\n";
+      return -1;
     }
-
-    sequence.buf = nvsl::RCast<char *>(read_buf);
-
-    sequence.is_completed = 0;
-    sequence.ns_entry = ns_entry;
-
-    DBGH(4) << "Issuing read command to qpair " << ns_entry->qpair << "\n";
-
-    rc = spdk_nvme_ns_cmd_read(ns_entry->ns, ns_entry->qpair, sequence.buf,
-                               start_lba, lba_count, io_complete, &sequence, 0);
-
-    DBGH(2) << "Read return code " << rc << " sequence.is_completed "
-            << sequence.is_completed << std::endl;
-
-    if (rc == 0) {
-      while (not sequence.is_completed) {
-        spdk_nvme_qpair_process_completions(ns_entry->qpair, 0);
-      }
-    }
-
-    memcpy(buf, sequence.buf, lba_count << 9);
-
-    break;
   }
+
+  sequence.buf = nvsl::RCast<char *>(read_buf);
+
+  sequence.is_completed = 0;
+  sequence.ns_entry = ns_entry;
+
+  DBGH(4) << "Issuing read command to qpair " << ns_entry->qpair << "\n";
+
+  rc = spdk_nvme_ns_cmd_read(ns_entry->ns, ns_entry->qpair, sequence.buf,
+                             start_lba, lba_count, io_complete, &sequence, 0);
+
+  DBGH(2) << "Read return code " << rc << " sequence.is_completed "
+          << sequence.is_completed << std::endl;
+
+  if (rc == 0) {
+    while (not sequence.is_completed) {
+      spdk_nvme_qpair_process_completions(ns_entry->qpair, 0);
+    }
+  }
+
+  memcpy(buf, sequence.buf, lba_count << 9);
+
 
   return (sequence.is_completed == 1) ? 0 : -1;
 }
 
 std::unique_ptr<ubd_sequence>
 UserBlkDev::write(const void *buf, off_t start_lba, off_t lba_count) {
-  struct ns_entry *ns_entry = TAILQ_FIRST(&g_namespaces);
+  struct ns_entry *ns_entry = nullptr;
   auto sequence = std::make_unique<struct ubd_sequence>();
 
   int rc;
   size_t sz;
+  size_t ns_iter = 0;
+  const size_t tgt_ns = start_lba % namespace_cnt;
+
+  TAILQ_FOREACH(ns_entry, &g_namespaces, link) {
+    if (ns_iter == tgt_ns) {
+      break;
+    }
+
+    ns_iter++;
+  }
 
   sequence->using_cmb_io = 1;
   sequence->buf = (char *)spdk_nvme_ctrlr_map_cmb(ns_entry->ctrlr, &sz);
@@ -397,3 +417,6 @@ void UserBlkDev::ubd_sequence::free() {
     }
   }
 }
+
+size_t UserBlkDev::namespace_cnt = 0;
+    

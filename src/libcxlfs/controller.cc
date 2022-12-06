@@ -60,7 +60,7 @@ int Controller::evict_a_page() {
     clk.tock();
 
     if (clk.ns() / 1024 > 1) {
-      MAX_DIST_AGE *= 2;
+      MAX_DIST_AGE *= (clk.ns()/1024);
     }
 
     dist_age = 0;
