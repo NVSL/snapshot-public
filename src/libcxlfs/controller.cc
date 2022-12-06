@@ -60,7 +60,7 @@ int Controller::evict_a_page() {
     clk.tock();
 
     if (clk.ns() / 1024 > 1) {
-      MAX_DIST_AGE *= (clk.ns()/1024);
+      MAX_DIST_AGE *= (clk.ns() / 1024);
     }
 
     dist_age = 0;
@@ -69,6 +69,8 @@ int Controller::evict_a_page() {
   }
 
   addr_t target_page_idx = -1;
+
+  tgt_pg_calc_clk.tick();
 
   for (const auto [pg_idx, _] : mapped_pages) {
     if (!dist.contains(pg_idx)) {
@@ -92,6 +94,10 @@ int Controller::evict_a_page() {
   DBGH(3) << "Removing page from the mapped page list" << std::endl;
   const auto target_page = P(shm_start + (target_page_idx << 12));
 
+  tgt_pg_calc_clk.tock();
+
+  blk_wb_clk.tick();
+
   // Write the page to the backing media
   // TODO: Check if the page is actually dirty
   auto ubd_seq = ubd->write(target_page, target_page_idx * 8, page_size >> 9);
@@ -104,6 +110,10 @@ int Controller::evict_a_page() {
     return -1;
   }
 
+  blk_wb_clk.tock();
+
+  wb_nvme_wb_clk.tick();
+
   for (auto iter = ubd_wr_cq.size() - 1; iter > 0; iter--) {
     auto &entry = ubd_wr_cq[iter];
     if (entry->is_completed) {
@@ -115,6 +125,8 @@ int Controller::evict_a_page() {
       DBGH(4) << "Write request idx " << iter << " not yet done\n";
     }
   }
+
+  wb_nvme_wb_clk.tock();
 
   const auto prot = PROT_READ | PROT_WRITE;
   const auto flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED;
@@ -336,8 +348,13 @@ void *Controller::get_shm_end() {
 }
 
 std::unordered_map<std::string, nvsl::Clock> Controller::get_clocks() {
-  return {{"mbd.get_dist_lat", mbd->get_dist_lat},
-          {"blk_rd_clk", blk_rd_clk},
-          {"page_eviction_clk", page_eviction_clk},
-          {"page_fault_clk", page_fault_clk}};
+  return {
+      {"mbd.get_dist_lat", mbd->get_dist_lat},
+      {"blk_rd_clk", blk_rd_clk},
+      {"page_eviction_clk", page_eviction_clk},
+      {"page_fault_clk", page_fault_clk},
+      {"tgt_pg_calc_clk", tgt_pg_calc_clk},
+      {"blk_wb_clk", blk_wb_clk},
+      {"wb_nvme_wb_clk", wb_nvme_wb_clk},
+  };
 }

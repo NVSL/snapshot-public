@@ -40,7 +40,9 @@ void mb_workingsetsize() {
 
   char *shm = RCast<char *>(ctrl.get_shm());
 
-  std::cerr << "size, lat, faults, dist_lat, blk_rd_clk, page_fault_clk, page_eviction_clk, size, lat, faults\n";
+  std::cerr << "size, lat, faults, dist_lat, blk_rd_clk, page_fault_clk, "
+               "page_eviction_clk, tgt_pg_calc, blk_wb, wb_nvme_wb, size, lat, "
+               "faults\n";
 
   for (size_t wss = MIN_WRK_SET_SIZE; wss < MAX_WRK_SET_SIZE; wss <<= 1) {
     Clock clk;
@@ -57,7 +59,10 @@ void mb_workingsetsize() {
               << clks.at("mbd.get_dist_lat").ns_per_event() / 1000 << "us, "
               << clks.at("blk_rd_clk").ns_per_event() / 1000 << "us, "
               << clks.at("page_fault_clk").ns_per_event() / 1000 << "us, "
-              << clks.at("page_eviction_clk").ns_per_event() / 1000 << "us";
+              << clks.at("page_eviction_clk").ns_per_event() / 1000 << "us, "
+              << clks.at("tgt_pg_calc_clk").ns_per_event() / 1000 << "us, "
+              << clks.at("blk_wb_clk").ns_per_event() / 1000 << "us, "
+              << clks.at("wb_nvme_wb_clk").ns_per_event() / 1000 << "us ";
     ctrl.flush_cache();
     ctrl.reset_stats();
 
