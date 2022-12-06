@@ -38,6 +38,7 @@ private:
 
   nvsl::Clock blk_rd_clk, page_eviction_clk, page_fault_clk, tgt_pg_calc_clk,
       blk_wb_clk, wb_nvme_wb_clk;
+  nvsl::StatsScalar mbd_dist_sz;
 
   uint64_t page_size, shm_size;
   std::unordered_map<addr_t, bool> mapped_pages;
@@ -82,4 +83,5 @@ public:
   void resize_cache(size_t pg_cnt);
   void reset_stats();
   std::unordered_map<std::string, nvsl::Clock> get_clocks();
+  std::unordered_map<std::string, size_t> get_stats();
 };
