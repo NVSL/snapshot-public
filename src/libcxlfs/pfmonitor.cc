@@ -21,6 +21,7 @@
 #include "libcxlfs/pfmonitor.hh"
 #include "nvsl/common.hh"
 #include "nvsl/error.hh"
+#include "nvsl/trace.hh"
 
 using nvsl::P;
 
@@ -38,73 +39,50 @@ int PFMonitor::error(std::string err_str, bool has_errno /* = true */) {
   return -1;
 }
 
+static PFMonitor *pfm_static;
+
+void    
+PFMonitor::handler(int sig, siginfo_t *si, void *ucontext) {
+  int rc = -1;
+  const void *place = si->si_addr;
+  const auto place_u64 = nvsl::RCast<uint64_t>(place);
+  const auto start_u64 = nvsl::RCast<uint64_t>(pfm_static->start);
+  const auto end_u64 = start_u64 + pfm_static->len;
+
+  if ((place_u64 >= start_u64) and (place_u64 < end_u64)) {
+    const auto page_aligned = ((uint64_t)place / 4096) * 4096;
+    auto src = pfm_static->cb(page_aligned);
+
+    rc = mprotect((void *)page_aligned, 0x1000, PROT_READ | PROT_WRITE);
+    if (rc == -1) {
+      DBGE << "mprotect failed: " << PSTR() << "\n";
+      exit(1);
+    }
+
+    memcpy((void*)page_aligned, src, 0x1000);
+  } else {
+    std::cerr << "Unhandled SIGSEGV at " << place << "\n";
+    std::cerr << nvsl::get_stack_trace() << "\n";
+    exit(1);
+  }
+
+  return;
+}
+
 /** @brief Monitor fd for page faults. Blocking. **/
 int PFMonitor::monitor_fd_blocking(int fd, Callback &cb) {
-  struct pollfd evt = {};
-  struct uffd_msg fault_msg = {0};
+  int rc = -1;
 
-  evt.fd = fd;
-  evt.events = POLLIN;
+  std::cerr << "Registering sigaction handler\n";
 
-  while (1) {
-    int pollval = poll(&evt, 1, 10);
+  struct sigaction action;
+  action.sa_sigaction = handler;
+  sigemptyset(&action.sa_mask);
+  action.sa_flags = SA_SIGINFO;
+  rc = sigaction(SIGSEGV, &action, NULL);
+  this->cb = cb;
 
-    switch (pollval) {
-    case -1:
-      perror("poll/userfaultfd");
-      continue;
-    case 0:
-      continue;
-    case 1:
-      DBGH(2) << "Handling page fault!" << std::endl;
-      break;
-    default:
-      DBGE << "Unexpected poll result" << std::endl;
-      return -1;
-    }
-
-    /* unexpected poll events */
-    if (evt.revents & POLLERR) {
-      return error("++ POLLERR");
-    } else if (evt.revents & POLLHUP) {
-      return error("++ POLLHUP");
-    }
-
-    if (read(fd, &fault_msg, sizeof(fault_msg)) != sizeof(fault_msg)) {
-      return error("ioctl_userfaultfd read");
-    }
-
-    const char *place = (char *)fault_msg.arg.pagefault.address;
-    DBGH(3) << "Got page fault at " << (void *)(place) << std::endl;
-
-    /* handle the page fault */
-    if (fault_msg.event & UFFD_EVENT_PAGEFAULT) {
-      const auto page_aligned = ((uint64_t)place / 4096) * 4096;
-      auto src = cb(page_aligned);
-
-      const struct uffdio_range range = {.start = page_aligned, .len = 0x1000};
-
-      if (P(page_aligned) !=
-          mmap(P(page_aligned), 0x1000, PROT_READ | PROT_WRITE,
-               MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0)) {
-        DBGE << "mmap to drop backing page of a mapping failed: " << PSTR()
-             << "\n";
-      }
-
-      const int rc = NumaBinder::move_range(src, 0x1000, tgt_node);
-      if (rc < 0) {
-        DBGE << "numabind failed " << strerror(-rc) << std::endl;
-      }
-
-      if (ioctl(fd, UFFDIO_WAKE, &range) == -1) {
-        perror("ioctl/wake");
-        exit(1);
-      } else {
-        free(src);
-        DBGH(3) << "fault handled\n";
-      }
-    }
-  }
+  return rc;
 }
 
   /** @brief Get the pagefault file descriptor **/
@@ -145,16 +123,8 @@ int PFMonitor::init(int tgt_node /* = 0 */) {
 
   /** @brief Monitor for page faults and handle them using cb **/
   int PFMonitor::monitor(Callback cb) {
-    int res = 0;
-
-    NVSL_ASSERT(pf_fd != -1, "init() not called for PFMonitor");
-
-    if (pf_fd != -1) {
-      res = this->monitor_fd_blocking(pf_fd, cb);
-      close(pf_fd);
-    } else {
-      res = pf_fd;
-    }
+    pfm_static = this;
+    int res = this->monitor_fd_blocking(pf_fd, cb);
 
     return res;
   }
@@ -170,24 +140,8 @@ int PFMonitor::init(int tgt_node /* = 0 */) {
    * @details Address start and start+size should be page aligned.
    **/
   int PFMonitor::register_range(void *start, size_t len) {
-    struct uffdio_register reg = {};
-    int res;
-
-    NVSL_ASSERT(pf_fd != -1, "init() not called for PFMonitor");
-
-    DBGH(3) << "Register range start " << start << " len " << len << "\n";
-
-    reg.mode = UFFDIO_REGISTER_MODE_MISSING;
-    reg.range = {};
-    reg.range.start = (unsigned long long)start;
-    reg.range.len = (unsigned long long)len;
-
-    res = ioctl(this->pf_fd, UFFDIO_REGISTER, &reg);
-    if (res != 0) {
-      return error("ioctl(fd, UFFDIO_REGISTER, ...) failed");
-    }
-
-    DBGH(2) << "Range registered\n";
+    this->start = start;
+    this->len = len;
 
     return 0;
   }
