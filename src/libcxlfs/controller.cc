@@ -71,10 +71,16 @@ int Controller::evict_a_page() {
   addr_t target_page_idx = -1;
 
   tgt_pg_calc_clk.tick();
+  mbd_dist_sz += dist.size();
 
+  size_t pg_lookup_cnt = 0;
   for (const auto [pg_idx, _] : mapped_pages) {
     if (!dist.contains(pg_idx)) {
       target_page_idx = pg_idx;
+    }
+
+    if (pg_lookup_cnt++ > MAX_MAPPED_PG_LOOKUP) {
+      break;
     }
   }
 
@@ -248,6 +254,8 @@ Controller::Controller() {
   mbd = new MemBWDist;
   nbd = new NumaBinder();
 
+  mbd_dist_sz.reset();
+
   page_size = (uint64_t)sysconf(_SC_PAGESIZE);
 
   mbd->start_sampling(250);
@@ -333,6 +341,11 @@ void Controller::reset_stats() {
   this->page_eviction_clk.reset();
   this->blk_rd_clk.reset();
   this->page_fault_clk.reset();
+  this->tgt_pg_calc_clk.reset();
+  this->blk_wb_clk.reset();
+  this->wb_nvme_wb_clk.reset();
+  this->mbd_dist_sz.reset();
+
 }
 
 void *Controller::get_shm() {
@@ -356,5 +369,12 @@ std::unordered_map<std::string, nvsl::Clock> Controller::get_clocks() {
       {"tgt_pg_calc_clk", tgt_pg_calc_clk},
       {"blk_wb_clk", blk_wb_clk},
       {"wb_nvme_wb_clk", wb_nvme_wb_clk},
+  };
+}
+
+std::unordered_map<std::string, size_t> Controller::get_stats() {
+  return {
+    {"mbd_dist_sz.avg", mbd_dist_sz.avg()},
+    {"mbd_dist_sz.max", mbd_dist_sz.max()},
   };
 }

@@ -51,7 +51,9 @@ void mb_workingsetsize() {
       shm[rand() % wss] += 1;
     }
     clk.tock();
+
     const auto clks = ctrl.get_clocks();
+    const auto stats = ctrl.get_stats();
     std::cerr << wss << ", " << clk.ns() / (MAX_ACCESSES * 1000) << "."
               << std::setw(3) << std::setfill('0')
               << (clk.ns() / MAX_ACCESSES) % 1000 << "us";
@@ -62,7 +64,9 @@ void mb_workingsetsize() {
               << clks.at("page_eviction_clk").ns_per_event() / 1000 << "us, "
               << clks.at("tgt_pg_calc_clk").ns_per_event() / 1000 << "us, "
               << clks.at("blk_wb_clk").ns_per_event() / 1000 << "us, "
-              << clks.at("wb_nvme_wb_clk").ns_per_event() / 1000 << "us ";
+              << clks.at("wb_nvme_wb_clk").ns_per_event() / 1000 << "us, "
+              << stats.at("mbd_dist_sz.avg") << ", "
+              << stats.at("mbd_dist_sz.max") << "";
     ctrl.flush_cache();
     ctrl.reset_stats();
 
