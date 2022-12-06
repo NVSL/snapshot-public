@@ -8,14 +8,14 @@ dclang_links:
 	$(PUDDLES_MAKE) ../bin/dclang
 	$(PUDDLES_MAKE) ../bin/dclang++
 
-examples: libstoreinst libpmdkemul
+examples: libpmdkemul
 	$(PUDDLES_MAKE) -C examples
 
 libdsaemu:
 	$(PUDDLES_MAKE) -C libdsaemu
 	$(PUDDLES_MAKE) ../lib/libdsaemu.so
 
-libpmdkemul: storeinst-pass dclang_links
+libpmdkemul: storeinst-pass dclang_links libstoreinst
 	$(PUDDLES_MAKE) -C libpmdkemul
 	$(PUDDLES_MAKE) ../lib/libpmdkemul.so
 
