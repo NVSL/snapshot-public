@@ -60,10 +60,12 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
         DBGW << "Calling nvsl::libvram::malloc(" << (void *)__len << ")\n";
 
         result = nvsl::libvram::malloc(__len);
+
       } else if (tomss) {
         DBGW << "Calling nvsl::libcxlfs::malloc(" << (void *)__len << ")\n";
 
         result = nvsl::libcxlfs::malloc(__len);
+        memset(result, 0, __len);
       } else {
         NVSL_ERROR("Unknown device type\n");
       }

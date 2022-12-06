@@ -226,10 +226,20 @@ int main(int argc, char *argv[]) {
   if (fs::is_regular_file(args.pool_path)) {
     std::cout << "Opening existing pool" << std::endl;
     pool = pmemobj_open(args.pool_path.c_str(), "linkedlist");
+
+    if (pool == nullptr) {
+      perror("pmemobj_open");
+      exit(1);
+    }
   } else {
-    std::cout << "Created a new pool" << std::endl;
+    std::cout << "Creating a new pool" << std::endl;
     pool = pmemobj_create(args.pool_path.c_str(), "linkedlist",
                           PMEMOBJ_MIN_POOL * 500, 0600);
+
+    if (pool == nullptr) {
+      perror("pmemobj_create");
+      exit(1);
+    }
   }
 
   TOID(struct linkedlist_pmdk_t)

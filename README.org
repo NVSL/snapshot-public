@@ -10,6 +10,9 @@
 - LLVM-13
 
 ** Build
+
+Optionally, change options in make.config to modify the build.
+
 To build the project:
 #+begin_src shell
   make -j$(nproc)

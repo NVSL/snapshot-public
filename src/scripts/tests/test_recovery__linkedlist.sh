@@ -32,7 +32,7 @@ test_recovery_linkedlist() {
     printf "> Recovering\n"
     recOut=$(echo "p" | "$BIN" "$POOL" 2>/dev/null)
 
-    recMatch=`echo "$recOut" | grep -Eo '\\\$ 1 \$'`
+    recMatch=`echo "$recOut" | grep -E '\\\$ ' | head -n1`
     assertEquals '$ 1 ' "${recMatch}"
 }
 suite_addTest test_recovery_linkedlist
@@ -44,16 +44,16 @@ test_recovery_linkedlist_multiple() {
     rm -rf "$LOG_LOC" "${PMEM_LOC}/"linkedlist*
 
     printf "> Creating a pool\n" | tee -a "${LOG_F}"
-    echo "i 1\ni 2\ni 3" | "$BIN" "$POOL" | tee -a "${LOG_F}" 2>/dev/null 1>&2
+    echo "i 1\ni 2\ni 3" | "$BIN" "$POOL" 2>"${LOG_F}" 1>&2
 
     printf "> Crashing on insertion\n" | tee -a "${LOG_F}"
-    echo "i 10" | CXLBUF_CRASH_ON_COMMIT=1  "$BIN" "$POOL" | tee -a "${LOG_F}" 2>/dev/null 1>&2
+    echo "i 100" | CXLBUF_CRASH_ON_COMMIT=1  "$BIN" "$POOL" 2>"${LOG_F}" 1>&2
 
     printf "> Recovering\n"
     recOut=$(echo "p" | "$BIN" "$POOL" 2>/dev/null)
-    printf "recOut = \n====\n${recOut}\n====\n"
-    recMatch=`echo "$recOut" | grep -Eo '\\\$ 2 3 1 \$'`
 
-    assertEquals '$ 2 3 1 ' "${recMatch}"
+    recMatch=`echo "$recOut" | grep -E '\\\$ ' | head -n1`
+
+    assertEquals '$ 1 2 3 ' "${recMatch}"
 }
 suite_addTest test_recovery_linkedlist_multiple

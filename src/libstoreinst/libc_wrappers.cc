@@ -355,9 +355,11 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
           }
         }
 
-        std::cerr << "resizing cache\n";
-        nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
-        nvsl::libcxlfs::ctrlr->reset_stats();
+        if (nvsl::libcxlfs::ctrlr) {
+          std::cerr << "resizing cache\n";
+          nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
+          nvsl::libcxlfs::ctrlr->reset_stats();
+        }
       }
 
       DBGH(1) << "Calling snapshot (not msync)" << std::endl;

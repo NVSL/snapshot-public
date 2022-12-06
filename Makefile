@@ -1,5 +1,5 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-FILTER:=--gtest_filter="*membwdist*"
+FILTER:=--gtest_filter="*ignore_all*"
 .PHONY: all
 all: bin lib spdk | check_compiler
 	$(PUDDLES_MAKE) -C src
