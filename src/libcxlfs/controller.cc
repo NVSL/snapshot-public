@@ -72,9 +72,14 @@ int Controller::evict_a_page() {
 
   tgt_pg_calc_clk.tick();
 
+  size_t pg_lookup_cnt = 0;
   for (const auto [pg_idx, _] : mapped_pages) {
     if (!dist.contains(pg_idx)) {
       target_page_idx = pg_idx;
+    }
+
+    if (pg_lookup_cnt++ > MAX_MAPPED_PG_LOOKUP) {
+      break;
     }
   }
 
