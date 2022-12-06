@@ -134,21 +134,13 @@ int Controller::evict_a_page() {
 
   wb_nvme_wb_clk.tock();
 
-  const auto prot = PROT_READ | PROT_WRITE;
-  const auto flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED;
-  auto addr = mmap(target_page, page_size, prot, flags, -1, 0);
-  pfm->register_range(target_page, page_size);
+  int rc = mprotect(target_page, page_size, PROT_NONE);
 
-  if (addr == MAP_FAILED) {
-    DBGE << "mmap() for evicted page failed: " << PSTR() << std::endl;
-    return -1;
+  if (rc == -1) {
+    DBGE << "mprotect failed: " << PSTR() << "\n";
+    exit(1);
   }
-
-  if (addr != target_page) {
-    DBGE << "Unable to remap at the same address" << std::endl;
-    return -1;
-  }
-
+  
   mapped_pages.erase(target_page_idx);
   used_pages--;
 
@@ -208,7 +200,12 @@ void Controller::monitor_thread() {
     page_fault_clk.tock();
     return buf;
   };
-  pfm->monitor(notify_page_fault);
+
+  std::cerr << "calling pfm::monitor\n";
+  if (-1 == pfm->monitor(notify_page_fault)) {
+    DBGE << "Unable to start page fault handler\n";
+    exit(1);
+  }
   return;
 }
 
@@ -300,15 +297,17 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
 
   shm_start = RCast<char *>(shm_addr);
 
-  rc = pfm->register_range(shm_addr, shm_size);
+  rc = mprotect(shm_start, shm_size, PROT_NONE);
+  pfm->register_range(shm_start, shm_size);
 
   if (rc == -1) {
-    DBGE << "Failed to register the range for the page fault handler"
+    DBGE << "Failed to register the range using mprotect: " << PSTR()
          << std::endl;
     return -1;
   }
 
   if (not monitor_thread_running) {
+    std::cerr << "starting monitor thread\n";
     pthread_t pf_thread;
     rc = pthread_create(&pf_thread, nullptr, &monitor_thread_wrapper, this);
 
@@ -319,6 +318,8 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
 
     monitor_thread_running = true;
   }
+
+  sleep(1);
 
   return 0;
 }

@@ -8,14 +8,16 @@
 
 #pragma once
 
+#include <bits/types/siginfo_t.h>
 #include <functional>
 #include <string>
+
+#include <sys/types.h>
 
 class PFMonitor {
 public:
   using addr_t = uint64_t;
   using Callback = std::function<void *(addr_t)>;
-
 private:
   int pf_fd = -1;
   int tgt_node = 0;
@@ -43,4 +45,11 @@ public:
 
   /** @brief Register an address range with PFMonitor **/
   int register_range(void *start, size_t range);
+
+  static void handler(int sig, siginfo_t *si, void *ucontext);
+
+private:
+  Callback cb;
+  void *start;
+  size_t len;
 };
