@@ -2,30 +2,46 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${DIR}/common.sh
+ROOT="${DIR}/../../"
 
-
-MAP_ROOT="/home/smahar/git/cxlbuf/src/examples/"
+MAP_ROOT="${ROOT}/src/examples/"
 MAP_PMDK="map_pmdk/mapcli"
 MAP_CXLBUF="map/map"
 PMDK_POOL="/mnt/pmem0/map"
 FS_DJ_POOL="/mnt/pmem0p2/map"
 FS_POOL="/mnt/pmem0p3/map"
 SCALE=4
+LD_PRELOAD=""
 
-OPS=400000
+OPS=10000000
+EXP="$1"
 
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
+export PMEM_IS_PMEM_FORCE=1
 export CXL_MODE_ENABLED=0
 export CXLBUF_USE_HUGEPAGE=1
 set -e
 # set -x
 
+if [ -z "${1-}" ]; then
+    printf "USAGE:\n\t${BASH_SOURCE[0]} (MSS|PMEM)\n" >&2
+    exit 1
+fi
+
+if [ "$EXP" = "MSS" ]; then
+    PMDK_POOL="/mnt/mss0/map"
+    LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
+    export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
+fi
+
+
 clear() {
     rm -f "${PMDK_POOL}"*
     rm -f "${FS_POOL}"*
     rm -f "${FS_DJ_POOL}"*
-    rm -rf "${LOG_LOC}"    
+    rm -rf "${LOG_LOC}"
+    rm -rf /mnt/mss0/*
 }
 
 using_perf() {
@@ -40,7 +56,7 @@ execute_insert() {
 
     # PMDK
     clear
-    echo 'k\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'k\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
@@ -55,6 +71,10 @@ execute_insert() {
         | tr -d '\n')
 
     printf ",$(bc <<< "scale=$SCALE; $val/1000000000")"
+
+    if [ "$EXP" = "MSS" ]; then
+        return
+    fi
 
     # msync - no huge pages
     clear
@@ -92,7 +112,7 @@ execute_delete() {
 
     # PMDK
     clear
-    echo 'R\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'R\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
@@ -108,7 +128,12 @@ execute_delete() {
         | sed 's/Total ns: //g' \
         | tr -d '\n')
 
-    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000")"
+
+    if [ "$EXP" = "MSS" ]; then
+        printf "\n"
+        return
+    fi
 
     # msync - no huge page
     clear
@@ -118,7 +143,7 @@ execute_delete() {
         | sed 's/Total ns: //g' \
         | tr -d '\n')
 
-    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000"),"
 
     # msync - huge page
     clear
@@ -146,7 +171,7 @@ execute_traverse() {
 
     # PMDK
     clear
-    echo 'C\n' | "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'C\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
         | tr -d '\n'
@@ -160,7 +185,11 @@ execute_traverse() {
               | sed 's/Total ns: //g'\
               | tr -d '\n')
 
-    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+    printf "$(bc <<< "scale=$SCALE; $val/1000000000")"
+
+    if [ "$EXP" = "MSS" ]; then
+        return
+    fi
 
     # msync - no huge page
     clear
@@ -169,7 +198,7 @@ execute_traverse() {
               | sed 's/Total ns: //g'\
               | tr -d '\n')
 
-    printf "$(bc <<< "scale=$SCALE; $val/1000000000"),"
+    printf ",$(bc <<< "scale=$SCALE; $val/1000000000"),"
 
     # msync - use huge page
     clear
@@ -210,8 +239,16 @@ execute() {
     execute_traverse
 }
 
-printf "operation,pmdk,snapshot,msync,msync huge pages,msync data journal\n"
+printf "operation,pmdk,snapshot"
+if [ "$EXP" != "MSS" ]; then
+    printf ",msync,msync huge pages,msync data journal"
+fi
+printf "\n"
+
 execute
 
+if [ "$EXP" = "MSS" ]; then
+    printf "\n"
+fi
 
 

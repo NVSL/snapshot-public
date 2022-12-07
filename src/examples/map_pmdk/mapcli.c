@@ -1,30 +1,30 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /* Copyright 2015-2019, Intel Corporation */
 
-#include <assert.h>
 #include "ex_common.h"
+#include <assert.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
-#include <inttypes.h>
 
 #include <libpmemobj.h>
 
 #include "map.h"
 #include "map_btree.h"
 
-#define PM_HASHSET_POOL_SIZE (160 * 1024 * 1024)
-#define BULK_INSERT_CNT (400000)
+#define PM_HASHSET_POOL_SIZE (1024 * 1024 * 1024)
+#define BULK_INSERT_CNT (10000000)
 
 POBJ_LAYOUT_BEGIN(map);
 POBJ_LAYOUT_ROOT(map, struct root);
 POBJ_LAYOUT_END(map);
 
 struct root {
-	TOID(struct map) map;
+  TOID(struct map) map;
 };
 
 static PMEMobjpool *pop;

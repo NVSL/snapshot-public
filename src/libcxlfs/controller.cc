@@ -51,7 +51,9 @@ int Controller::evict_a_page() {
   const auto rg_start = RCast<addr_t>(get_shm());
   const auto rg_end = RCast<addr_t>(get_shm_end());
 
+#ifdef CXLBUF_TESTING_GOODIES
   page_eviction_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
 
   if (dist_age == MAX_DIST_AGE) {
     nvsl::Clock clk;
@@ -70,7 +72,10 @@ int Controller::evict_a_page() {
 
   addr_t target_page_idx = -1;
 
+#ifdef CXLBUF_TESTING_GOODIES
   tgt_pg_calc_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
+
   mbd_dist_sz += dist.size();
 
   size_t pg_lookup_cnt = 0;
@@ -100,9 +105,10 @@ int Controller::evict_a_page() {
   DBGH(3) << "Removing page from the mapped page list" << std::endl;
   const auto target_page = P(shm_start + (target_page_idx << 12));
 
+#ifdef CXLBUF_TESTING_GOODIES
   tgt_pg_calc_clk.tock();
-
   blk_wb_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
 
   // Write the page to the backing media
   // TODO: Check if the page is actually dirty
@@ -116,9 +122,10 @@ int Controller::evict_a_page() {
     return -1;
   }
 
+#ifdef CXLBUF_TESTING_GOODIES
   blk_wb_clk.tock();
-
   wb_nvme_wb_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
 
   for (auto iter = ubd_wr_cq.size() - 1; iter > 0; iter--) {
     auto &entry = ubd_wr_cq[iter];
@@ -132,7 +139,9 @@ int Controller::evict_a_page() {
     }
   }
 
+#ifdef CXLBUF_TESTING_GOODIES
   wb_nvme_wb_clk.tock();
+#endif // CXLBUF_TESTING_GOODIES
 
   int rc = mprotect(target_page, page_size, PROT_NONE);
 
@@ -140,11 +149,13 @@ int Controller::evict_a_page() {
     DBGE << "mprotect failed: " << PSTR() << "\n";
     exit(1);
   }
-  
+
   mapped_pages.erase(target_page_idx);
   used_pages--;
 
+#ifdef CXLBUF_TESTING_GOODIES
   page_eviction_clk.tock();
+#endif // CXLBUF_TESTING_GOODIES
 
   return 0;
 }
@@ -158,9 +169,15 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 
   DBGH(3) << "Getting lba " << start_lba << std::endl;
 
+#ifdef CXLBUF_TESTING_GOODIES
   blk_rd_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
+
   ubd->read_blocking(buf, start_lba, 8);
+
+#ifdef CXLBUF_TESTING_GOODIES
   blk_rd_clk.tock();
+#endif // CXLBUF_TESTING_GOODIES
 
   DBGH(3) << "Adding the page to the mapped page list" << std::endl;
   mapped_pages[((pf_addr - RCast<uint64_t>(get_shm())) >> 12)] = true;
@@ -171,7 +188,9 @@ void *Controller::map_page_from_blkdev(addr_t pf_addr) {
 void Controller::monitor_thread() {
   nbd->bind_to_node(remote_node);
   PFMonitor::Callback notify_page_fault = [&](addr_t addr) {
+#ifdef CXLBUF_TESTING_GOODIES
     page_fault_clk.tick();
+#endif // CXLBUF_TESTING_GOODIES
     std::stringstream pg_info;
     pg_info << "used_pages " << used_pages << " max " << max_active_pg_cnt;
 
@@ -197,7 +216,9 @@ void Controller::monitor_thread() {
 
     DBGH(2) << "Replacing page done " << RCast<void *>(addr) << "\n";
 
+#ifdef CXLBUF_TESTING_GOODIES
     page_fault_clk.tock();
+#endif // CXLBUF_TESTING_GOODIES
     return buf;
   };
 

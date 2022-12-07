@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
   } else {
     std::cout << "Creating a new pool" << std::endl;
     pool = pmemobj_create(args.pool_path.c_str(), "linkedlist",
-                          PMEMOBJ_MIN_POOL * 500, 0600);
+                          4UL * 1024UL * 1024 * 1024, 0600);
 
     if (pool == nullptr) {
       perror("pmemobj_create");

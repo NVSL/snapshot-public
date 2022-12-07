@@ -25,7 +25,7 @@
 #include "map_btree.hh"
 #include "nvsl/clock.hh"
 
-constexpr size_t MIN_POOL_SZ = 1024 * 1024UL * 160;
+constexpr size_t MIN_POOL_SZ = 1024 * 1024UL * 1024;
 
 using namespace std::chrono;
 using namespace nvsl;

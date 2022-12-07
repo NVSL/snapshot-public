@@ -41,8 +41,7 @@ int PFMonitor::error(std::string err_str, bool has_errno /* = true */) {
 
 static PFMonitor *pfm_static;
 
-void    
-PFMonitor::handler(int sig, siginfo_t *si, void *ucontext) {
+void PFMonitor::handler(int sig, siginfo_t *si, void *ucontext) {
   int rc = -1;
   const void *place = si->si_addr;
   const auto place_u64 = nvsl::RCast<uint64_t>(place);
@@ -59,7 +58,8 @@ PFMonitor::handler(int sig, siginfo_t *si, void *ucontext) {
       exit(1);
     }
 
-    memcpy((void*)page_aligned, src, 0x1000);
+    memcpy((void *)page_aligned, src, 0x1000);
+    free(src);
   } else {
     std::cerr << "Unhandled SIGSEGV at " << place << "\n";
     std::cerr << nvsl::get_stack_trace() << "\n";
