@@ -28,11 +28,27 @@
 using namespace nvsl;
 
 constexpr size_t CACHE_SIZE = 128 * nvsl::MiB;
-constexpr size_t TOTAL_SHM_SIZE = 1 * nvsl::GiB;
+constexpr size_t TOTAL_SHM_SIZE = 4 * nvsl::GiB;
 
 constexpr size_t MAX_ACCESSES = 50000;
-constexpr size_t MIN_WRK_SET_SIZE = 1;
+constexpr size_t MIN_WRK_SET_SIZE = 1 * nvsl::KiB;
 constexpr size_t MAX_WRK_SET_SIZE = TOTAL_SHM_SIZE;
+
+static unsigned long x = 123456789, y = 362436069, z = 521288629;
+
+unsigned long xorshf96(void) { // period 2^96-1
+  unsigned long t;
+  x ^= x << 16;
+  x ^= x >> 5;
+  x ^= x << 1;
+
+  t = x;
+  x = y;
+  y = z;
+  z = t ^ x ^ y;
+
+  return z;
+}
 
 void mb_workingsetsize() {
   Controller ctrl;
@@ -48,7 +64,7 @@ void mb_workingsetsize() {
     Clock clk;
     clk.tick();
     for (size_t access_i = 0; access_i < MAX_ACCESSES; access_i++) {
-      shm[rand() % wss] += 1;
+      shm[xorshf96() % wss] += 1;
     }
     clk.tock();
 

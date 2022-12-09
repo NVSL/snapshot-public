@@ -1,3 +1,4 @@
+*.rej
 .make.tmp
 *.no_sync
 a.out

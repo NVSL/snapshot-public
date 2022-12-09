@@ -258,7 +258,6 @@ void Controller::flush_cache() {
         "Flush cache called without initializing the controller first\n");
   }
 
-  std::cerr << "Flushing caches\n";
   for (const auto [page_idx, _] : mapped_pages) {
     const auto page_addr = shm_start + (page_idx << 12);
     ubd->write_blocking(P(page_addr), page_idx * 8, 8);
@@ -327,11 +326,23 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   shm_start = RCast<char *>(shm_addr);
 
   rc = mprotect(shm_start, shm_size, PROT_NONE);
+  if (rc == -1) {
+    DBGE << "Failed to mprotect the range using mprotect: " << PSTR()
+         << std::endl;
+    return -1;
+  }
+
   pfm->register_range(shm_start, shm_size);
 
   if (rc == -1) {
     DBGE << "Failed to register the range using mprotect: " << PSTR()
          << std::endl;
+    return -1;
+  }
+
+  rc = NumaBinder::move_range(shm_addr, shm_size, remote_node);
+  if (rc == -1) {
+    DBGE << "Failed to move the range to remote_node: " << std::endl;
     return -1;
   }
 
