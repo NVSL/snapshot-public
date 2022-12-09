@@ -23,7 +23,7 @@ include ../../common.make
 all: map
 
 map: $(OBJECTS)
-	$(PUDDLES_CXX) $(CXXFLAGS) $^ $(MAPS_OBJS) -o $@ $(LDFLAGS) $(LINKFLAGS)
+	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(MAPS_OBJS) $(LINKFLAGS)
 
 clean: clean_deps
 	-rm -f *.o map

@@ -57,7 +57,7 @@ void *nvsl::libcxlfs::malloc(size_t bytes) {
   std::cerr << __FUNCTION__ << "()\n";
   if (not ctrlr) {
     ctrlr = new Controller();
-    ctrlr->init(INIT_CACHE_SIZE >> 12, MEM_SIZE >> 12);
+    ctrlr->init(CACHE_SIZE >> 12, MEM_SIZE >> 12);
   }
 
   void *result = (char *)ctrlr->get_shm() + bump_off;
@@ -181,6 +181,14 @@ void *nvsl::libcxlfs::mmap(void *addr, size_t length, int prot, int flags,
   result = RCast<char *>(fd_desc_e.region) + fd_desc_e.va_alloc_off;
 
   return result;
+}
+
+void nvsl::libcxlfs::flush_caches() {
+  if (ctrlr) {
+    ctrlr->flush_cache();
+  } else {
+    DBGW << "Called " << __FUNCTION__ << "() with no controller\n";
+  }
 }
 
 __attribute__((destructor)) void libcxlfs_dtor() {

@@ -6,7 +6,11 @@
  * @brief  Pointers page fault for the current process
  */
 
+#define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>
+#include <boost/stacktrace/stacktrace_fwd.hpp>
 #include <cstring>
+#include <execinfo.h>
 #include <functional>
 #include <iostream>
 

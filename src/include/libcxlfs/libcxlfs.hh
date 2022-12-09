@@ -10,8 +10,10 @@ namespace nvsl {
     extern Controller *ctrlr;
 
     constexpr size_t MEM_SIZE = 16UL * nvsl::LP_SZ::GiB;
-    constexpr size_t INIT_CACHE_SIZE = 1 * nvsl::LP_SZ::GiB;
+    constexpr size_t INIT_CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
     constexpr size_t CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
+
+    void flush_caches();
 
     void *malloc(size_t bytes);
 

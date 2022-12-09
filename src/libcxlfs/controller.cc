@@ -253,6 +253,12 @@ void Controller::read_from_ubd(void *buf, char *addr) {
 }
 
 void Controller::flush_cache() {
+  if (shm_pg_cnt == 0) {
+    NVSL_ERROR(
+        "Flush cache called without initializing the controller first\n");
+  }
+
+  std::cerr << "Flushing caches\n";
   for (const auto [page_idx, _] : mapped_pages) {
     const auto page_addr = shm_start + (page_idx << 12);
     ubd->write_blocking(P(page_addr), page_idx * 8, 8);
@@ -310,6 +316,8 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
 
   if (shm_addr == MAP_FAILED) {
     DBGE << "mmap call for allocating shared memory failed" << std::endl;
+    DBGE << "mmap call: "
+         << nvsl::mmap_to_str(nullptr, shm_size, prot, flags, -1, 0) << "\n";
     DBGE << PSTR() << std::endl;
     return -1;
   }

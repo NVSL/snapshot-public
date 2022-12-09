@@ -13,7 +13,7 @@ FS_POOL="/mnt/pmem0p3/map"
 SCALE=4
 LD_PRELOAD=""
 
-OPS=10000000
+OPS=1000000
 EXP="$1"
 
 export PMEM_START_ADDR=0x10000000000
@@ -33,6 +33,7 @@ if [ "$EXP" = "MSS" ]; then
     PMDK_POOL="/mnt/mss0/map"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
     export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
+    export REMOTE_NODE=1
 fi
 
 

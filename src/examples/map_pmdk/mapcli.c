@@ -17,7 +17,7 @@
 #include "map_btree.h"
 
 #define PM_HASHSET_POOL_SIZE (1024 * 1024 * 1024)
-#define BULK_INSERT_CNT (10000000)
+#define BULK_INSERT_CNT (1000000)
 
 POBJ_LAYOUT_BEGIN(map);
 POBJ_LAYOUT_ROOT(map, struct root);

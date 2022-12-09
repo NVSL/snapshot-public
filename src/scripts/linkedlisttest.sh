@@ -27,7 +27,8 @@ if [ "$1" = "MSS" ]; then
     CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs"
     
     LL_CXLBUF="linkedlist_tx_cxlfs/linkedlist_tx_cxlfs"
-    OPS=$((5*$MILLION))
+    OPS=$((1*$MILLION))
+    export REMOTE_NODE=1
 elif [ "$1" = "GPU" ]; then
     PMDK_POOL="/mnt/cxl0/linkedlist"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
