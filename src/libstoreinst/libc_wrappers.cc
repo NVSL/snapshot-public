@@ -303,24 +303,24 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
   DBGH(2) << "Found " << tls_logs->size() << " TLS logs\n";
 
-  for (auto tls_log_ptr : *tls_logs) {
-    auto &tls_log = *tls_log_ptr;
+  if (storeInstEnabled) [[likely]] {
+    for (auto tls_log_ptr : *tls_logs) {
+      auto &tls_log = *tls_log_ptr;
 
-    tls_log.flush_all();
+      tls_log.flush_all();
 
-    /* Drain all the stores to the log and update its state before modifying the
-       backing file */
-    tls_log.log_area->log_offset = 0;
-    tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
+      /* Drain all the stores to the log and update its state before modifying
+         the backing file */
+      tls_log.log_area->log_offset = 0;
+      tls_log.set_state(cxlbuf::Log::State::ACTIVE, true);
 
-    if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
-      DBGE << "MS_FORCE_SNAPSHOT called with no sign of instrumentation\n";
-      exit(1);
-    }
+      if ((flags & MS_FORCE_SNAPSHOT) and !storeInstEnabled) {
+        DBGE << "MS_FORCE_SNAPSHOT called with no sign of instrumentation\n";
+        exit(1);
+      }
 
-    DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
-            << ")\n";
-    if (storeInstEnabled) [[likely]] {
+      DBGH(1) << "Call to snapshot(" << addr << ", " << bytes << ", " << flags
+              << ")\n";
       if (firstSnapshot) [[unlikely]] {
         DBGH(1) << "== First snapshot ==" << std::endl;
         firstSnapshot = false;
@@ -473,22 +473,20 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
       } else {
         DBGW << "Not resetting log state on snapshot()\n";
       }
-    } else {
-      DBGH(1) << "Calling real msync" << std::endl;
-
-      void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
-
-      const int mret = real_msync(pg_aligned, bytes, flags);
-
-      if (-1 == mret) {
-        DBGE << "msync(" << pg_aligned << ", " << bytes << ", " << flags
-             << ")\n";
-        perror("msync for snapshot failed");
-        exit(1);
-      }
+      tls_log.clear();
     }
+  } else {
+    DBGH(1) << "Calling real msync" << std::endl;
 
-    tls_log.clear();
+    void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
+
+    const int mret = real_msync(pg_aligned, bytes, flags);
+
+    if (-1 == mret) {
+      DBGE << "msync(" << pg_aligned << ", " << bytes << ", " << flags << ")\n";
+      perror("msync for snapshot failed");
+      exit(1);
+    }
   }
 
 #ifdef CXLBUF_TESTING_GOODIES

@@ -14,7 +14,8 @@ _LIBS_DIR := $(shell readlink -f $(DIR))
 PUDDLE_CXXFLAGS += -std=c++20
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
 EXTRA_LDFLAGS +=-L$(_LIBS_DIR) -Wl,-R$(_LIBS_DIR) -Wl,--no-as-needed
-EXTRA_LINKFLAGS +=-luuid -lpthread -mclwb -ldl -lvram -lcxlfs
+EXTRA_LINKFLAGS +=-lrt -luuid -lpthread -rdynamic -mclwb -lvram -lcxlfs -ldl
+EXTRA_LINKFLAGS +=-Wl,--exclude-libs,ALL -Wl,--no-as-needed
 EXTRA_LINKFLAGS +=-Wl,--whole-archive
 EXTRA_LINKFLAGS +=$(LIBS_DIR)/libstoreinst.a 
 EXTRA_LINKFLAGS +=-Wl,--no-whole-archive
@@ -22,6 +23,7 @@ EXTRA_LINKFLAGS +=-Wl,--no-whole-archive
 CXX = $(LLVM_DIR)/bin/clang++
 CC = $(LLVM_DIR)/bin/clang
 DXX = ../../storeinst-pass/dclang++
+export DCLANG_DONT_LINK=1
 
 include ../../common.make
 
@@ -42,7 +44,7 @@ simplekv_puddles.no_sync: simplekv_puddles.o.no_sync
 	$(PUDDLES_CXX)  $(CXXFLAGS) $(LDFLAGS) $(LINKFLAGS) $^ -o $@
 
 simplekv_puddles.inst: simplekv_puddles.cc
-	$(PUDDLES_DXX) $(INCLUDE) -flto $(CXXFLAGS) $(LDFLAGS) -luuid -lpthread -mclwb -ldl  $^ -o $@
+	$(PUDDLES_DXX) $(INCLUDE) -DCXLFS_SUPPORT_ENABLED $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
 simplekv_puddles.msync: simplekv_puddles.cc
 	$(PUDDLES_CXX) $(INCLUDE) -DDISABLE_CXLBUF -flto $(CXXFLAGS) $(LDFLAGS) -luuid -lpthread -mclwb -ldl  $^ -o $@

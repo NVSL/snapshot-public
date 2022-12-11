@@ -6,6 +6,10 @@
  * values, string as a key and array to hold buckets
  */
 
+#ifdef CXLFS_SUPPORT_ENABLED
+#include "libcxlfs/controller.hh"
+#endif // CXLFS_SUPPORT_ENABLED
+
 #include <fcntl.h>
 #include <fstream>
 #include <stdexcept>
@@ -14,13 +18,14 @@
 #include <vector>
 
 #include "common.hh"
+#include "libcxlfs/libcxlfs.hh"
 #include "libstoreinst.hh"
 #include "nvsl/clock.hh"
 #include "nvsl/string.hh"
 
 #include "simplekv_puddles.hh"
 
-constexpr size_t MIN_POOL_SZ = (102 * 1024 * 1024);
+constexpr size_t MIN_POOL_SZ = (4 * 1024UL * 1024 * 1024);
 size_t cur_ator_head = 0;
 
 using kv_type = simple_kv<int, 1800>;
@@ -51,14 +56,14 @@ int main(int argc, char *argv[]) {
   const char *path = argv[1];
 
   try {
-    auto res = new reservoir_t(nvsl::S(path), MIN_POOL_SZ * 10);
+    auto res = new reservoir_t(nvsl::S(path), MIN_POOL_SZ);
 
     auto root = res->allocate_root<kv_type>();
 
     std::cout << "Root at " << (void *)root << std::endl;
-    root->init(res, MIN_POOL_SZ * 10);
+    root->init(res, MIN_POOL_SZ);
     if (root == nullptr) {
-      msync(root, MIN_POOL_SZ * 10, MS_SYNC);
+      msync(root, MIN_POOL_SZ, MS_SYNC);
     }
 
     if (std::string(argv[2]) == "get" && argc == 4) {
@@ -123,6 +128,10 @@ int main(int argc, char *argv[]) {
         run_workload.close();
       }
 
+#ifdef CXLFS_SUPPORT_ENABLED
+      nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::MEM_SIZE >> 12);
+#endif // CXLFS_SUPPORT_ENABLED
+
       /* Execute the load trace */
       std::cout << "| Executing load trace" << std::endl;
       size_t iter = 0;
@@ -132,28 +141,35 @@ int main(int argc, char *argv[]) {
           std::flush(std::cout);
         }
         root->put(key, value, false);
-        // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
+        // snapshot(root, MIN_POOL_SZ, MS_SYNC);
       }
       std::cout << std::endl;
+
+      root->put("a", 0, true);
+      msync(root, 1024, MS_SYNC);
+
+#ifdef CXLFS_SUPPORT_ENABLED
+      nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
+#endif // CXLFS_SUPPORT_ENABLED
 
       /* Execute the run trace */
       std::cout << "Executing run trace" << std::endl;
 #ifndef DISABLE_CXLBUF
       startTracking = true;
 #endif
-      root->put("a", 0, true);
-      msync(root, 1024, MS_SYNC);
-
       size_t run_size = run_ops.size();
+      size_t reads = 0, writes = 0;
       clk.tick();
       volatile size_t result = 0;
       for (size_t run = 0; run < 1; run++) {
         for (size_t i = 0; i < run_size; ++i) {
           if (run_ops[i] == "Update") {
+            writes++;
             root->put(run_keys[i], value, true);
-            // snapshot(root, MIN_POOL_SZ*10, MS_SYNC);
+            // snapshot(root, MIN_POOL_SZ, MS_SYNC);
           } else if (run_ops[i] == "Read") {
             try {
+              reads++;
               result = result + root->get(run_keys[i]);
             } catch (const std::exception &e) {
               std::cout << "run = " << run << " i = " << i << std::endl;
@@ -163,6 +179,7 @@ int main(int argc, char *argv[]) {
         }
       }
       clk.tock();
+      std::cout << "Done." << std::endl;
 
       const auto msyncSleepNsStr = get_env_str("CXLBUF_MSYNC_SLEEP_NS");
       auto msyncSleepNs = 0;
@@ -172,8 +189,8 @@ int main(int argc, char *argv[]) {
       } catch (const std::exception &e) {
       }
 
+      std::cout << reads << " reads " << writes << " writes\n";
       std::cout << clk.summarize() << std::endl;
-      std::cout << "Done." << std::endl;
       std::cout << "excluded = " << clk.ns() << std::endl;
       std::cout << "ns = " << clk.ns() + msyncSleepNs << std::endl;
     } else {

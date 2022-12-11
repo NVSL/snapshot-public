@@ -55,6 +55,9 @@ To run tests:
   echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
 #+end_src
 
+Experimentation notes:
+- /mnt/pmem0p3 is normal (non-dax) ext4
+- /mnt/pmem0p2 is a data=journal mounted ext4
 
 ** Example environment for compilation
 

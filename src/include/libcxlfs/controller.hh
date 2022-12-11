@@ -47,7 +47,7 @@ private:
   /** @brief Tracks the pages currently mapped in the SHM **/
   uint64_t used_pages = 0;
 
-  char *shm_start;
+  char *shm_start = nullptr;
   char *shm_end;
 
   bool monitor_thread_running = false;

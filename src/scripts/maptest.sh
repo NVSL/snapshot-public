@@ -8,14 +8,15 @@ MAP_ROOT="${ROOT}/src/examples/"
 MAP_PMDK="map_pmdk/mapcli"
 MAP_CXLBUF="map/map"
 PMDK_POOL="/mnt/pmem0/map"
-FS_DJ_POOL="/mnt/pmem0p2/map"
-FS_POOL="/mnt/pmem0p3/map"
+FS_DJ_POOL="/mnt/pmem0p2/map" # 0p3 is normal (non-dax)
+FS_POOL="/mnt/pmem0p2/map" # 0p2 is a data=journal mounted ext4
 SCALE=4
 LD_PRELOAD=""
 
 OPS=1000000
 EXP="$1"
 
+NUMA_CTL=""
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
 export PMEM_IS_PMEM_FORCE=1
@@ -34,6 +35,8 @@ if [ "$EXP" = "MSS" ]; then
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
     export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
     export REMOTE_NODE=1
+else
+    NUMA_CTL="numactl -N0 --"
 fi
 
 
@@ -57,7 +60,7 @@ execute_insert() {
 
     # PMDK
     clear
-    echo 'k\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'k\n' | LD_PRELOAD="${LD_PRELOAD}" ${NUMA_CTL} "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
@@ -79,7 +82,7 @@ execute_insert() {
 
     # msync - no huge pages
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
@@ -89,7 +92,7 @@ execute_insert() {
 
     # msync - huge pages
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
@@ -99,7 +102,7 @@ execute_insert() {
 
     # msync - data journal
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_DJ_POOL}" btree bulk i $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_DJ_POOL}" btree bulk i $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
@@ -113,7 +116,7 @@ execute_delete() {
 
     # PMDK
     clear
-    echo 'R\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'R\n' | LD_PRELOAD="${LD_PRELOAD}" ${NUMA_CTL} "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
@@ -138,7 +141,7 @@ execute_delete() {
 
     # msync - no huge page
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns: ' \
         | sed 's/Total ns: //g' \
@@ -148,7 +151,7 @@ execute_delete() {
 
     # msync - huge page
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns: ' \
         | sed 's/Total ns: //g' \
@@ -158,7 +161,7 @@ execute_delete() {
 
     # msync - data journal
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk r $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk r $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns: ' \
         | sed 's/Total ns: //g' \
@@ -172,7 +175,7 @@ execute_traverse() {
 
     # PMDK
     clear
-    echo 'C\n' | LD_PRELOAD="${LD_PRELOAD}" "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
+    echo 'C\n' | LD_PRELOAD="${LD_PRELOAD}" ${NUMA_CTL} "${MAP_ROOT}/${MAP_PMDK}" btree "${PMDK_POOL}"  2>&1 \
         | grep 'Elapsed s = ' \
         | sed 's/Elapsed s = //g' \
         | tr -d '\n'
@@ -194,7 +197,7 @@ execute_traverse() {
 
     # msync - no huge page
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
               | grep 'Total ns' \
               | sed 's/Total ns: //g'\
               | tr -d '\n')
@@ -203,7 +206,7 @@ execute_traverse() {
 
     # msync - use huge page
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
               | grep 'Total ns' \
               | sed 's/Total ns: //g'\
               | tr -d '\n')
@@ -212,7 +215,7 @@ execute_traverse() {
 
     # msync data journal
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk c $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${MAP_ROOT}/${MAP_CXLBUF}" "${FS_POOL}" btree bulk c $OPS 2>&1 \
               | grep 'Total ns' \
               | sed 's/Total ns: //g'\
               | tr -d '\n')

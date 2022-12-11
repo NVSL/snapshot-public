@@ -6,7 +6,10 @@
  * values, string as a key and array to hold buckets
  */
 
+#include "libcxlfs/libcxlfs.hh"
 #include "nvsl/clock.hh"
+#include <dlfcn.h>
+#include <filesystem>
 #include <fstream>
 #include <libpmemobj++/make_persistent_atomic.hpp>
 #include <libpmemobj++/pool.hpp>
@@ -14,6 +17,8 @@
 #include <vector>
 
 #include "simplekv_pmdk.hh"
+
+constexpr size_t POOL_SZ = 4UL * 1024 * 1024 * 1024;
 
 using kv_type = simple_kv<int, 1800>;
 
@@ -26,6 +31,19 @@ void show_usage(char *argv[]) {
             << std::endl;
 }
 
+typedef void(fptr_t)(size_t);
+
+void resize_cache(size_t pages) {
+  void *handle = dlopen(NULL, RTLD_NOW);
+  if (handle) {
+    fptr_t *resize_cache_sym = (fptr_t *)dlsym(handle, "resize_cache");
+    if (resize_cache_sym) {
+      std::cerr << "Calling resize cache\n";
+      resize_cache_sym(pages);
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     show_usage(argv);
@@ -35,9 +53,16 @@ int main(int argc, char *argv[]) {
   const char *path = argv[1];
 
   pmem::obj::pool<root> pop;
-
   try {
-    pop = pmem::obj::pool<root>::open(path, "simplekv");
+    if (not std::filesystem::is_regular_file(path)) {
+      pop = pmem::obj::pool<root>::create(path, "simplekv", POOL_SZ);
+      if (pop.root() == nullptr) {
+        std::cerr << "Pool creation failed\n";
+        exit(1);
+      }
+    } else {
+      pop = pmem::obj::pool<root>::open(path, "simplekv");
+    }
     auto r = pop.root();
 
     if (r->kv == nullptr) {
@@ -105,12 +130,16 @@ int main(int argc, char *argv[]) {
         run_workload.close();
       }
 
+      resize_cache(nvsl::libcxlfs::MEM_SIZE >> 12);
+
       int c = 0;
       std::cout << "Executing load trace" << std::endl;
       for (auto &key : load_keys) {
         r->kv->put(key, value);
         // std::cout << c++ << "\n";
       }
+
+      resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
 
       size_t run_size = run_ops.size();
       std::cout << "Executing run trace" << std::endl;
@@ -128,8 +157,9 @@ int main(int argc, char *argv[]) {
       clk.tock();
 
       clk.reconcile();
-      
+
       std::cout << clk.summarize(run_ops.size()) << std::endl;
+      exit(0);
     } else {
       show_usage(argv);
       pop.close();

@@ -54,7 +54,7 @@ std::unordered_map<cxlfs_fd_t, cxlfs_path_t> fd_to_path;
 std::unordered_map<cxlfs_fd_t, fd_desc_t> fd_desc;
 
 void *nvsl::libcxlfs::malloc(size_t bytes) {
-  std::cerr << __FUNCTION__ << "()\n";
+  std::cerr << __FUNCTION__ << "(" << (void *)bytes << ")\n";
   if (not ctrlr) {
     ctrlr = new Controller();
     ctrlr->init(CACHE_SIZE >> 12, MEM_SIZE >> 12);

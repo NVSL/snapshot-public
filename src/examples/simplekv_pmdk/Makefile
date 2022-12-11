@@ -7,7 +7,7 @@ INCLUDE +=-iquote../../
 
 DIR      := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 LIBS_DIR := $(shell readlink -f $(DIR)../../../lib)
-EXTRA_LDFLAGS := $(shell PKG_CONFIG_PATH="/usr/local/lib:/usr/local/lib64/pkgconfig/" pkg-config --libs libpmemobj++)
+EXTRA_LDFLAGS := $(shell PKG_CONFIG_PATH="/usr/local/lib:/usr/local/lib64/pkgconfig/" pkg-config --libs libpmemobj++) -ldl
 
 include ../../common.make
 

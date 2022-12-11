@@ -11,6 +11,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include "libcxlfs/controller.hh"
 #include "libcxlfs/libcxlfs.hh"
 #include "libvram/libvram.hh"
 #include "nvsl/error.hh"
@@ -81,6 +82,10 @@ void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
 
 int munmap(void *__addr, size_t __len) __THROW {
   return 0;
+}
+
+extern "C" void resize_cache(size_t pages) {
+  nvsl::libcxlfs::ctrlr->resize_cache(pages);
 }
 
 /**

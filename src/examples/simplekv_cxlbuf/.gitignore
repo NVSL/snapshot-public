@@ -1,5 +1,8 @@
 memtrace.out.*
 simplekv_puddles
+simplekv_puddles.msync
+simplekv_puddles.inst
+simplekv_puddles.no_msync
 *.inst
 *.bc
 .deps/*

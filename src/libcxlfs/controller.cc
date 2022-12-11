@@ -294,6 +294,7 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   this->max_active_pg_cnt = max_active_pg_cnt;
   this->shm_pg_cnt = shm_pg_cnt;
 
+  std::cerr << "resetting fault count at " << this->faults.value() << std::endl;
   this->faults.reset();
 
   shm_size = shm_pg_cnt * page_size;
@@ -310,15 +311,22 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
   }
 
   const auto prot = PROT_READ | PROT_WRITE;
-  const auto flags = MAP_ANONYMOUS | MAP_PRIVATE;
-  auto shm_addr = mmap(nullptr, shm_size, prot, flags, -1, 0);
+  const auto flags =
+      MAP_ANONYMOUS | MAP_PRIVATE | ((shm_start == nullptr) ? 0 : MAP_FIXED);
+  auto shm_addr = mmap(shm_start, shm_size, prot, flags, -1, 0);
 
   if (shm_addr == MAP_FAILED) {
     DBGE << "mmap call for allocating shared memory failed" << std::endl;
     DBGE << "mmap call: "
-         << nvsl::mmap_to_str(nullptr, shm_size, prot, flags, -1, 0) << "\n";
+         << nvsl::mmap_to_str(shm_start, shm_size, prot, flags, -1, 0) << "\n";
     DBGE << PSTR() << std::endl;
     return -1;
+  }
+
+  if (shm_start != nullptr and shm_addr != shm_start) {
+    DBGE << "Unable to remap SHM at " << (void *)shm_start << " got "
+         << (void *)shm_addr << "\n";
+    exit(1);
   }
 
   nbd->bind_to_node(0);
@@ -365,6 +373,9 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
 }
 
 void Controller::resize_cache(size_t pg_cnt) {
+  std::cerr << "Resizing cache to " << (void *)pg_cnt
+            << " pages = " << (pg_cnt << 12) / nvsl::MiB
+            << " MiB, faults = " << this->faults.value() << "\n";
   const auto should_flush = pg_cnt < this->max_active_pg_cnt;
   this->max_active_pg_cnt = pg_cnt;
 

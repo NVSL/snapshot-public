@@ -2,6 +2,7 @@
 
 #include "nvsl/constants.hh"
 #include <cstddef>
+#include <unistd.h>
 
 class Controller;
 
@@ -11,7 +12,7 @@ namespace nvsl {
 
     constexpr size_t MEM_SIZE = 16UL * nvsl::LP_SZ::GiB;
     constexpr size_t INIT_CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
-    constexpr size_t CACHE_SIZE = 128 * nvsl::LP_SZ::MiB;
+    constexpr size_t CACHE_SIZE = INIT_CACHE_SIZE;
 
     void flush_caches();
 
