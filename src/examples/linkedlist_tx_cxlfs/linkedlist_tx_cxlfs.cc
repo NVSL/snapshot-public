@@ -23,7 +23,7 @@
 using namespace nvsl;
 using namespace std::chrono;
 
-constexpr size_t MIN_POOL_SZ = 4UL * 1024 * 1024 * 1024;
+constexpr size_t MIN_POOL_SZ = 1UL * 1024 * 1024 * 1024;
 extern bool startTracking;
 
 struct args_t {

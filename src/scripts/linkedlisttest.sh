@@ -20,6 +20,7 @@ FS_DJ_POOL="/mnt/pmem0p2/map"
 
 OPS=$MILLION
 EXP="$1"
+NUMA_CTL=""
 
 if [ "$1" = "MSS" ]; then
     PMDK_POOL="/mnt/mss0/linkedlist"
@@ -37,6 +38,7 @@ else
     PMDK_POOL="/mnt/pmem0/linkedlist"
     LD_PRELOAD=""
     CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs"
+    NUMA_CTL="numactl -N0 --"
 fi
 
 export PMEM_START_ADDR=0x10000000000
@@ -66,7 +68,7 @@ execute() {
 
     printf "${NAME},"
     clean
-    pmdk=$(printf "$OP" | LD_PRELOAD="${LD_PRELOAD}" "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
+    pmdk=$(printf "$OP" | LD_PRELOAD="${LD_PRELOAD}" ${NUMA_CTL} "${LL_ROOT}/${LL_PMDK}" "${PMDK_POOL}"  2>&1 \
         | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${pmdk},"
@@ -80,19 +82,19 @@ execute() {
     if [ "$EXP" != "MSS" ]; then
         printf ","
         clean
-        printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
+        printf "$OP" | CXLBUF_USE_HUGEPAGE=0  ${NUMA_CTL} "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
             | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
         printf ","
 
         clean
-        printf "$OP" | "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
+        printf "$OP" |  ${NUMA_CTL} "${LL_ROOT}/${LL_CXLBUF}" "${FS_POOL}" 2>&1 \
             | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
 
         printf ","
 
         clean
-        printf "$OP" | CXLBUF_USE_HUGEPAGE=0 "${LL_ROOT}/${LL_CXLBUF}" "${FS_DJ_POOL}" 2>&1 \
+        printf "$OP" | CXLBUF_USE_HUGEPAGE=0  ${NUMA_CTL} "${LL_ROOT}/${LL_CXLBUF}" "${FS_DJ_POOL}" 2>&1 \
             | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n'
     fi
     printf "\n"

@@ -22,7 +22,7 @@
 using namespace nvsl;
 using namespace std::chrono;
 
-constexpr size_t MIN_POOL_SZ = 1024 * 1024;
+constexpr size_t MIN_POOL_SZ = 1UL * 1024 * 1024 * 1024;
 extern bool startTracking;
 
 struct args_t {
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
   args_t args = parse_args(std::vector<std::string>(argv, argv + argc));
 
   auto res =
-      new mmf(bip::open_or_create, args.puddle_path.c_str(), MIN_POOL_SZ * 128);
+      new mmf(bip::open_or_create, args.puddle_path.c_str(), MIN_POOL_SZ);
 
   auto root_ptr = res->find<linkedlist_t>("root").first;
 
