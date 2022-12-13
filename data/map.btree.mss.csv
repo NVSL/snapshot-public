@@ -1,0 +1,4 @@
+operation,pmdk,snapshot
+insert,89.730423,26.7674
+delete,125.533881,30.4487
+read,90.517594,.2483
