@@ -19,7 +19,7 @@ NUMA_CTL=""
 LD_PRELOAD=""
 EXP="$1"
 
-YCSB_WRKLD="a b c d e f"
+YCSB_WRKLD="a b c d e f g"
 # YCSB_WRKLD="a c g"
 
 export PMEM_START_ADDR=0x10000000000
@@ -40,8 +40,9 @@ if [ "$EXP" = "MSS" ]; then
     PMDK_POOL="/mnt/mss0/simplekv"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
     export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
-    export REMOTE_NODE=1
+    export REMOTE_NODE=0
 else
+#    export CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs/"
     NUMA_CTL="numactl -N0 --"
 fi
 
@@ -76,15 +77,15 @@ remake() {
         recompile
     else
         echo "Recompiling $(dirname "$CONFIG_FILE")" >&2
-        recompile >/dev/null 2>&1
+        recompile >>"$LOG_F" 2>&1
     fi
 }
 
 clean() {
-    rm -f "${PMDK_POOL}"*
-    rm -f "${FS_POOL}"*
-    rm -f "${FS_DJ_POOL}"*
-    rm -f "${LOG_LOC}"
+    rm -rf "${PMDK_POOL}"*
+    rm -rf "${FS_POOL}"*
+    rm -rf "${FS_DJ_POOL}"*
+    rm -rf "${LOG_LOC}"
 }
 
 execute() {
@@ -93,7 +94,7 @@ execute() {
     LD_PRELOAD="${LD_PRELOAD}" ${NUMA_CTL}  "${SIMPLEKV_ROOT}/${SIMPLEKV_PMDK}" "${PMDK_POOL}" ycsb \
                                         "${YCSB_LOC}${wrkld}.load" \
                                         "${YCSB_LOC}${wrkld}.run"  2>&1 \
-        | tee /tmp/run.log \
+        | tee -a "$LOG_F" \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
@@ -115,8 +116,8 @@ execute() {
     clean
 
     CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${FS_POOL}" \
-                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
-                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+                       ycsb "${YCSB_LOC}${wrkld}.load" \
+                       "${YCSB_LOC}${wrkld}.run"  2>&1 | tee -a "${LOG_F}"\
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
@@ -124,16 +125,16 @@ execute() {
     clean
 
     CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${FS_POOL}" \
-                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
-                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+                       ycsb "${YCSB_LOC}${wrkld}.load" \
+                       "${YCSB_LOC}${wrkld}.run"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     printf ","
     clean
 
     CXLBUF_USE_HUGEPAGE=0 CXL_MODE_ENABLED=0 ${NUMA_CTL} "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}" "${FS_DJ_POOL}" \
-                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
-                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+                       ycsb "${YCSB_LOC}${wrkld}.load" \
+                       "${YCSB_LOC}${wrkld}.run"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     clean
@@ -142,12 +143,12 @@ execute() {
 }
 
 execute_snapshot() {
-    rm -f "${PMDK_POOL}"*
-    rm -f "${LOG_LOC}"
+    rm -rf "${PMDK_POOL}"*
+    rm -rf "${LOG_LOC}"
 
     CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=1 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
-                       ycsb "${YCSB_LOC}${wrkld}-load-1.0" \
-                       "${YCSB_LOC}${wrkld}-run-1.0"  2>&1 \
+                       ycsb "${YCSB_LOC}${wrkld}.load" \
+                       "${YCSB_LOC}${wrkld}.run"  2>&1 \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
 
@@ -156,7 +157,12 @@ execute_snapshot() {
 
 
 remake volatile align
-printf "pmdk,snashot,msync,msync huge page,msync data journal\n"
+printf "pmdk,snashot"
+if [ "$EXP" != "MSS" ]; then
+    printf ",msync,msync huge page,msync data journal"
+fi
+printf "\n"
+
 for wrkld in $YCSB_WRKLD; do
     execute;
 done

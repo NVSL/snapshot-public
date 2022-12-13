@@ -20,7 +20,7 @@
 
 constexpr size_t POOL_SZ = 4UL * 1024 * 1024 * 1024;
 
-using kv_type = simple_kv<int, 1800>;
+using kv_type = simple_kv<int, 3500>;
 
 struct root {
   pmem::obj::persistent_ptr<kv_type> kv;

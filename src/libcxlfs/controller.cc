@@ -329,7 +329,7 @@ int Controller::init(std::size_t max_active_pg_cnt /* = 2 */,
     exit(1);
   }
 
-  nbd->bind_to_node(0);
+  nbd->bind_to_node(1 - this->remote_node);
 
   shm_start = RCast<char *>(shm_addr);
 

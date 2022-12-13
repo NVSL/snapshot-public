@@ -172,6 +172,7 @@ __attribute__((destructor)) void libstoreinst_dtor() {
 
   std::cerr << "Summary:\n";
   std::cerr << "snapshots = " << snapshots.value() << std::endl;
+  std::cerr << "real_msyncs = " << real_msyncs.value() << std::endl;
   std::cerr << nvsl::cxlbuf::skip_check_count->str() << "\n";
   std::cerr << nvsl::cxlbuf::logged_check_count->str() << "\n";
   std::cerr << nvsl::cxlbuf::tx_log_count_dist->str() << "\n";

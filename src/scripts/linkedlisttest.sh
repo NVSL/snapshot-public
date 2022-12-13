@@ -29,7 +29,7 @@ if [ "$1" = "MSS" ]; then
     
     LL_CXLBUF="linkedlist_tx_cxlfs/linkedlist_tx_cxlfs"
     OPS=$((1*$MILLION))
-    export REMOTE_NODE=1
+    export REMOTE_NODE=0
 elif [ "$1" = "GPU" ]; then
     PMDK_POOL="/mnt/cxl0/linkedlist"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"

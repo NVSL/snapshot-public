@@ -34,7 +34,7 @@ if [ "$EXP" = "MSS" ]; then
     PMDK_POOL="/mnt/mss0/map"
     LD_PRELOAD="${ROOT}/src/examples/redirect/libredirect.so"
     export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
-    export REMOTE_NODE=1
+    export REMOTE_NODE=0
 else
     NUMA_CTL="numactl -N0 --"
 fi

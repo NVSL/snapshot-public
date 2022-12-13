@@ -51,4 +51,4 @@ extern bool crashOnCommit;
 extern bool nopMsync;
 extern nvsl::Clock *perst_overhead_clk;
 extern size_t msyncSleepNs;
-extern nvsl::Counter snapshots;
+extern nvsl::Counter snapshots, real_msyncs;

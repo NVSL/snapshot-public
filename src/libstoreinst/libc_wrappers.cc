@@ -57,7 +57,7 @@ std::unordered_map<int, cxlbuf::fd_metadata_t> cxlbuf::mapped_addr;
 void *cxlbuf::mmap_start = nullptr;
 
 nvsl::Clock *perst_overhead_clk;
-nvsl::Counter snapshots;
+nvsl::Counter snapshots, real_msyncs;
 
 void cxlbuf::init_dlsyms() {
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
@@ -477,6 +477,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
     }
   } else {
     DBGH(1) << "Calling real msync" << std::endl;
+    real_msyncs++;
 
     void *pg_aligned = (void *)(((size_t)addr >> 12) << 12);
 

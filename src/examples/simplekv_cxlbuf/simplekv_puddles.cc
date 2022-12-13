@@ -28,7 +28,7 @@
 constexpr size_t MIN_POOL_SZ = (4 * 1024UL * 1024 * 1024);
 size_t cur_ator_head = 0;
 
-using kv_type = simple_kv<int, 1800>;
+using kv_type = simple_kv<int, 3500>;
 
 void *alloc(void *region, size_t bytes) {
   cur_ator_head += bytes;
@@ -129,7 +129,9 @@ int main(int argc, char *argv[]) {
       }
 
 #ifdef CXLFS_SUPPORT_ENABLED
-      nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::MEM_SIZE >> 12);
+      if (nvsl::libcxlfs::ctrlr) {
+        nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::MEM_SIZE >> 12);
+      }
 #endif // CXLFS_SUPPORT_ENABLED
 
       /* Execute the load trace */
@@ -149,7 +151,9 @@ int main(int argc, char *argv[]) {
       msync(root, 1024, MS_SYNC);
 
 #ifdef CXLFS_SUPPORT_ENABLED
-      nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
+      if (nvsl::libcxlfs::ctrlr) {
+        nvsl::libcxlfs::ctrlr->resize_cache(nvsl::libcxlfs::CACHE_SIZE >> 12);
+      }
 #endif // CXLFS_SUPPORT_ENABLED
 
       /* Execute the run trace */
