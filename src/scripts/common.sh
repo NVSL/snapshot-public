@@ -48,10 +48,10 @@ check_bin() {
     return 0
 }
 
+if [ -z "${DISABLE_SAFEGUARDS:-}" ]; then
+   set -eu
+   set -o pipefail
 
-set -eu
-set -o pipefail
-
-set -o errtrace
-trap 'backtrace' ERR
-
+   set -o errtrace
+   trap 'backtrace' ERR
+fi
