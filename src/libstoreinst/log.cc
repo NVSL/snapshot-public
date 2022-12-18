@@ -51,11 +51,11 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     perst_overhead_clk->tick();
 #endif // CXLBUF_TESTING_GOODIES
 
-    // #ifndef NDEBUG
+#ifndef NDEBUG
     NVSL_ASSERT((bytes < (1 << 22)), "Log request to location " +
                                          S((void *)start) + " for " + S(bytes) +
                                          " bytes is invalid");
-    // #endif
+#endif
 
 #ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
@@ -117,7 +117,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     }
 #endif
 
-    NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
+    // NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
 
 #ifdef CXLBUF_TESTING_GOODIES
     perst_overhead_clk->tock();

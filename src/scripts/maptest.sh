@@ -16,7 +16,8 @@ LD_PRELOAD=""
 OPS=1000000
 EXP="$1"
 
-NUMA_CTL=""
+NUMA_CTL="numactl -N0 --"
+NUMA_CTL_SNAPSHOT=""
 export PMEM_START_ADDR=0x10000000000
 export PMEM_END_ADDR=0x20000000000
 export PMEM_IS_PMEM_FORCE=1
@@ -36,12 +37,12 @@ if [ "$EXP" = "MSS" ]; then
     export CXLBUF_LOG_LOC="/mnt/mss0/cxlbuf_logs/"
     export REMOTE_NODE=0
 else
-    NUMA_CTL="numactl -N0 --"
+    NUMA_CTL_SNAPSHOT="$NUMA_CTL"
 fi
 
 
 clear() {
-    rm -f "${PMDK_POOL}"*
+    rm -rf "${PMDK_POOL}"*
     rm -f "${FS_POOL}"*
     rm -f "${FS_DJ_POOL}"*
     rm -rf "${LOG_LOC}"
@@ -68,7 +69,7 @@ execute_insert() {
 
     # Snapshot
     clear
-    val=$(CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
+    val=$(CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk i $OPS 2>&1 \
         | tee "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
@@ -126,7 +127,7 @@ execute_delete() {
 
     # Snapshot
     clear
-    val=$(CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
+    val=$(CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk r $OPS 2>&1 \
         | tee -a "$LOG_F" \
         | grep 'Total ns' \
         | sed 's/Total ns: //g' \
@@ -184,7 +185,7 @@ execute_traverse() {
 
     # Snapshot
     clear
-    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=1 "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
+    val=$(CXLBUF_USE_HUGEPAGE=1 CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${MAP_ROOT}/${MAP_CXLBUF}" "${PMDK_POOL}" btree bulk c $OPS 2>&1 \
               | grep 'Total ns' \
               | sed 's/Total ns: //g'\
               | tr -d '\n')

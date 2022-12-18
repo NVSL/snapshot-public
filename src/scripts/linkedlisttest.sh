@@ -20,7 +20,8 @@ FS_DJ_POOL="/mnt/pmem0p2/map"
 
 OPS=$MILLION
 EXP="$1"
-NUMA_CTL=""
+NUMA_CTL="numactl -N0 --"
+NUMA_CTL_SNAPSHOT=""
 
 if [ "$1" = "MSS" ]; then
     PMDK_POOL="/mnt/mss0/linkedlist"
@@ -38,7 +39,7 @@ else
     PMDK_POOL="/mnt/pmem0/linkedlist"
     LD_PRELOAD=""
     CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs"
-    NUMA_CTL="numactl -N0 --"
+    NUMA_CTL_SNAPSHOT="$NUMA_CTL"
 fi
 
 export PMEM_START_ADDR=0x10000000000
@@ -74,7 +75,7 @@ execute() {
     printf "${pmdk},"
 
     clean
-    cxlbuf=$(printf "$OP" | CXLBUF_LOG_LOC="${CXLBUF_LOG_LOC}" CXL_MODE_ENABLED=1 "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
+    cxlbuf=$(printf "$OP" | CXLBUF_LOG_LOC="${CXLBUF_LOG_LOC}" CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${LL_ROOT}/${LL_CXLBUF}" "${PMDK_POOL}" 2>&1 \
                  | grep 'Total ns' | head -n"$OCCUR" | tail -n1 | grep -Eo '[0-9]+' | tr -d '\n')
 
     printf "${cxlbuf}"

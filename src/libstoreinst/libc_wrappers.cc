@@ -370,7 +370,15 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
       size_t diff = end - start;
 
 #if LOG_FORMAT_VOLATILE
-      const auto &log_list = tls_log.entries;
+      auto &log_list = tls_log.entries;
+
+      if (log_list.size() > 10) {
+        std::sort(log_list.begin(), log_list.end(),
+                  [](nvsl::cxlbuf::Log::log_entry_lean_t a,
+                     nvsl::cxlbuf::Log::log_entry_lean_t b) -> bool {
+                    return a.addr < b.addr;
+                  });
+      }
 #elif LOG_FORMAT_NON_VOLATILE
       const auto &log_list = *tls_log.log_area;
 #else
@@ -378,11 +386,21 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 #endif
 
       size_t applied_cnt = 0, entry_cnt = 0;
-      for (const auto &entry : log_list) {
+      for (size_t i = 0; i < log_list.size(); i++) {
+        const auto &entry = log_list.at(i);
         /* Copy the logged location to the backing store if in range of
            snapshot */
         entry_cnt++;
-        if (entry.addr - start <= diff) [[likely]] {
+
+        bool skip_entry =
+            (i > 0) and ((log_list[i].addr == log_list[i - 1].addr) and
+                         (log_list[i].bytes == log_list[i - 1].bytes));
+
+        if ((entry.addr - start <= diff) and skip_entry) {
+          applied_cnt++;
+        }
+
+        if ((entry.addr - start <= diff) and not skip_entry) {
           const size_t offset = entry.addr - (uint64_t)start_addr;
           const size_t dst_addr = (size_t)(pm_back + offset);
 
