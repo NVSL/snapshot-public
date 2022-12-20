@@ -212,8 +212,11 @@ namespace nvsl {
 
     void cxlbuf_reg_tls_log();
 
-    extern nvsl::Counter *skip_check_count, *logged_check_count;
+    extern nvsl::Counter *skip_check_count, *logged_check_count,
+        *dup_log_entries;
     extern nvsl::StatsFreq<> *tx_log_count_dist;
+    extern nvsl::StatsScalar *total_bytes_wr, *total_bytes_wr_strm,
+        *total_bytes_flushed;
   } // namespace cxlbuf
 } // namespace nvsl
 

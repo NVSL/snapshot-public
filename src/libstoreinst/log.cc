@@ -25,12 +25,15 @@
     "Incompatible flags: LOG_FORMAT_VOLATILE and LOG_FORMAT_NON_VOLATILE enabled"
 #endif
 
-nvsl::Counter *nvsl::cxlbuf::skip_check_count,
-    *nvsl::cxlbuf::logged_check_count;
-nvsl::StatsFreq<> *nvsl::cxlbuf::tx_log_count_dist;
+using namespace nvsl;
+
+Counter *cxlbuf::skip_check_count, *cxlbuf::logged_check_count,
+    *cxlbuf::dup_log_entries;
+StatsFreq<> *cxlbuf::tx_log_count_dist;
+StatsScalar *cxlbuf::total_bytes_wr, *cxlbuf::total_bytes_wr_strm,
+    *nvsl::cxlbuf::total_bytes_flushed;
 
 extern nvsl::PMemOps *pmemops;
-using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
   auto cxlModeEnabled_reg = cxlModeEnabled;

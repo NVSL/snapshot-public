@@ -275,7 +275,7 @@ int fdatasync(int __fildes) {
 }
 
 __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
-  snapshots++;
+  ++snapshots;
   if (nopMsync) [[unlikely]] {
     DBGH(1) << "!!! Nop msync !!!\n";
     return 0;
@@ -386,17 +386,23 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 #endif
 
       size_t applied_cnt = 0, entry_cnt = 0;
+#if LOG_FORMAT_VOLATILE
       for (size_t i = 0; i < log_list.size(); i++) {
         const auto &entry = log_list.at(i);
+        bool skip_entry =
+            (i > 0) and ((log_list[i].addr == log_list[i - 1].addr) and
+                         (log_list[i].bytes == log_list[i - 1].bytes));
+#elif LOG_FORMAT_NON_VOLATILE
+      for (const auto &entry : log_list) {
+        bool skip_entry = false;
+#endif
+
         /* Copy the logged location to the backing store if in range of
            snapshot */
         entry_cnt++;
 
-        bool skip_entry =
-            (i > 0) and ((log_list[i].addr == log_list[i - 1].addr) and
-                         (log_list[i].bytes == log_list[i - 1].bytes));
-
         if ((entry.addr - start <= diff) and skip_entry) {
+          ++(*cxlbuf::dup_log_entries);
           applied_cnt++;
         }
 
@@ -454,10 +460,17 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
             pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
                                   new_sz);
+#ifndef NDEBUG
+            cxlbuf::total_bytes_wr->operator+=(new_sz);
+            cxlbuf::total_bytes_wr_strm->operator+=(new_sz);
+#endif
           } else {
             real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
                         entry.bytes);
             pmemops->flush((void *)dst_addr, entry.bytes);
+#ifndef NDEBUG
+            *cxlbuf::total_bytes_wr += entry.bytes;
+#endif
           }
         } else if (entry.addr == 0) {
           break;
