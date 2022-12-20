@@ -28,7 +28,8 @@
 using namespace nvsl;
 
 Counter *cxlbuf::skip_check_count, *cxlbuf::logged_check_count,
-    *cxlbuf::dup_log_entries;
+    *cxlbuf::dup_log_entries, *cxlbuf::back_to_back_dup_log,
+    *cxlbuf::total_log_entries, *cxlbuf::total_pers_log_entries;
 StatsFreq<> *cxlbuf::tx_log_count_dist;
 StatsScalar *cxlbuf::total_bytes_wr, *cxlbuf::total_bytes_wr_strm,
     *nvsl::cxlbuf::total_bytes_flushed;
@@ -60,9 +61,20 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
                                          " bytes is invalid");
 #endif
 
+#ifndef RELEASE
+    ++(*total_log_entries);
+#endif
+
 #ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
+    if ((this->last_log.addr == this->entries.back().addr) and
+        (this->last_log.bytes == this->entries.back().bytes)) {
+      ++(*back_to_back_dup_log);
+      return;
+    }
+
+    this->last_log = this->entries.back();
 #endif
 
     /* Write to the persistent log and flush and fence it */

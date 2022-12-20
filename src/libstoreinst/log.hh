@@ -148,6 +148,7 @@ namespace nvsl {
       };
 
     private:
+      log_entry_lean_t last_log = {0};
       size_t last_flush_offset = 0;
 
       void init_dirs();
@@ -168,7 +169,7 @@ namespace nvsl {
         log_area->log_offset = 0;
         log_area->tail_ptr = RCast<uint8_t *>(log_area->content);
         last_flush_offset = 0;
-
+        last_log = {0};
 #ifdef LOG_FORMAT_VOLATILE
         entries.clear();
 #endif
@@ -213,7 +214,8 @@ namespace nvsl {
     void cxlbuf_reg_tls_log();
 
     extern nvsl::Counter *skip_check_count, *logged_check_count,
-        *dup_log_entries;
+        *dup_log_entries, *back_to_back_dup_log, *total_log_entries,
+        *total_pers_log_entries;
     extern nvsl::StatsFreq<> *tx_log_count_dist;
     extern nvsl::StatsScalar *total_bytes_wr, *total_bytes_wr_strm,
         *total_bytes_flushed;

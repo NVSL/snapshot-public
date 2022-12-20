@@ -402,13 +402,19 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
         entry_cnt++;
 
         if ((entry.addr - start <= diff) and skip_entry) {
+#ifndef RELEASE
           ++(*cxlbuf::dup_log_entries);
+#endif // RELEASE
           applied_cnt++;
         }
 
         if ((entry.addr - start <= diff) and not skip_entry) {
           const size_t offset = entry.addr - (uint64_t)start_addr;
           const size_t dst_addr = (size_t)(pm_back + offset);
+
+#ifndef RELEASE
+          ++(*nvsl::cxlbuf::total_pers_log_entries);
+#endif // RELEASE
 
           applied_cnt++;
 
@@ -460,7 +466,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
             pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
                                   new_sz);
-#ifndef NDEBUG
+#ifndef RELEASE
             cxlbuf::total_bytes_wr->operator+=(new_sz);
             cxlbuf::total_bytes_wr_strm->operator+=(new_sz);
 #endif
@@ -468,7 +474,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
             real_memcpy((void *)dst_addr, (void *)(0UL + entry.addr),
                         entry.bytes);
             pmemops->flush((void *)dst_addr, entry.bytes);
-#ifndef NDEBUG
+#ifndef RELEASE
             *cxlbuf::total_bytes_wr += entry.bytes;
 #endif
           }

@@ -55,11 +55,18 @@ void init_counters() {
   c::total_bytes_wr_strm = new nvsl::StatsScalar();
   c::total_bytes_flushed = new nvsl::StatsScalar();
 
+  c::back_to_back_dup_log = new nvsl::Counter();
+  c::total_pers_log_entries = new nvsl::Counter();
+  c::total_log_entries = new nvsl::Counter();
   c::skip_check_count = new nvsl::Counter();
   c::dup_log_entries = new nvsl::Counter();
   c::logged_check_count = new nvsl::Counter();
   c::tx_log_count_dist = new nvsl::StatsFreq<>();
 
+  c::total_pers_log_entries->init("total_pers_log_entries",
+                                  "Total log entries actually persisted");
+  c::total_log_entries->init("total_log_entries",
+                             "Total log entries (log_range calls)");
   c::skip_check_count->init("skip_check_count", "Skipped memory checks");
   c::dup_log_entries->init("dup_log_entries", "Duplicate log entries");
   c::logged_check_count->init("logged_check_count", "Logged memory checks");
@@ -67,6 +74,9 @@ void init_counters() {
                              "Distribution of number of logs in a transaction",
                              5, 0, 30);
 
+  c::back_to_back_dup_log->init(
+      "back_to_back_dup_log",
+      "Back-to-back duplicate log entries on call to log_range()");
   c::total_bytes_wr->init("total_bytes_wr",
                           "Total bytes written across snapshots");
   c::total_bytes_wr_strm->init(
@@ -193,10 +203,13 @@ __attribute__((destructor)) void libstoreinst_dtor() {
   std::cerr << c::logged_check_count->str() << "\n";
   std::cerr << c::tx_log_count_dist->str() << "\n";
 
+  std::cerr << c::total_pers_log_entries->str() << "\n";
+  std::cerr << c::total_log_entries->str() << "\n";
   std::cerr << c::total_bytes_wr->str() << "\n";
   std::cerr << c::total_bytes_wr_strm->str() << "\n";
   std::cerr << c::total_bytes_flushed->str() << "\n";
   std::cerr << c::dup_log_entries->str() << "\n";
+  std::cerr << c::back_to_back_dup_log->str() << "\n";
   std::cerr << "perst_overhead = " << perst_overhead_clk->ns() << std::endl;
 }
 }
