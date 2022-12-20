@@ -29,7 +29,8 @@ using namespace nvsl;
 
 Counter *cxlbuf::skip_check_count, *cxlbuf::logged_check_count,
     *cxlbuf::dup_log_entries, *cxlbuf::back_to_back_dup_log,
-    *cxlbuf::total_log_entries, *cxlbuf::total_pers_log_entries;
+    *cxlbuf::total_log_entries, *cxlbuf::total_pers_log_entries,
+    *cxlbuf::mergeable_entries;
 StatsFreq<> *cxlbuf::tx_log_count_dist;
 StatsScalar *cxlbuf::total_bytes_wr, *cxlbuf::total_bytes_wr_strm,
     *nvsl::cxlbuf::total_bytes_flushed;

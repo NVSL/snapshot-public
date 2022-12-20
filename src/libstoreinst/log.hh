@@ -215,7 +215,7 @@ namespace nvsl {
 
     extern nvsl::Counter *skip_check_count, *logged_check_count,
         *dup_log_entries, *back_to_back_dup_log, *total_log_entries,
-        *total_pers_log_entries;
+        *total_pers_log_entries, *mergeable_entries;
     extern nvsl::StatsFreq<> *tx_log_count_dist;
     extern nvsl::StatsScalar *total_bytes_wr, *total_bytes_wr_strm,
         *total_bytes_flushed;

@@ -62,9 +62,12 @@ void init_counters() {
   c::dup_log_entries = new nvsl::Counter();
   c::logged_check_count = new nvsl::Counter();
   c::tx_log_count_dist = new nvsl::StatsFreq<>();
+  c::mergeable_entries = new nvsl::Counter();
 
   c::total_pers_log_entries->init("total_pers_log_entries",
                                   "Total log entries actually persisted");
+  c::mergeable_entries->init("mergeable_entries",
+                             "Mergeable entries in the log on snapshot()");
   c::total_log_entries->init("total_log_entries",
                              "Total log entries (log_range calls)");
   c::skip_check_count->init("skip_check_count", "Skipped memory checks");
@@ -203,6 +206,7 @@ __attribute__((destructor)) void libstoreinst_dtor() {
   std::cerr << c::logged_check_count->str() << "\n";
   std::cerr << c::tx_log_count_dist->str() << "\n";
 
+  std::cerr << c::mergeable_entries->str() << "\n";
   std::cerr << c::total_pers_log_entries->str() << "\n";
   std::cerr << c::total_log_entries->str() << "\n";
   std::cerr << c::total_bytes_wr->str() << "\n";

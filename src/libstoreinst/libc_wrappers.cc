@@ -379,6 +379,16 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
                     return a.addr < b.addr;
                   });
       }
+
+#ifndef RELEASE
+
+      for (size_t i = 1; i < log_list.size(); i++) {
+        if (log_list[i].addr == log_list[i - 1].addr + log_list[i - 1].bytes) {
+          ++(*cxlbuf::mergeable_entries);
+        }
+      }
+#endif // RELEASE
+
 #elif LOG_FORMAT_NON_VOLATILE
       const auto &log_list = *tls_log.log_area;
 #else
