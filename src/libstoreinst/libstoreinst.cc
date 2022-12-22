@@ -46,6 +46,7 @@ void *start_addr, *end_addr = nullptr;
 bool startTracking = false;
 bool storeInstEnabled = false;
 bool cxlModeEnabled = false;
+bool constructor_init_done = false;
 nvsl::PMemOps *pmemops;
 std::ofstream *traceStream;
 
@@ -143,6 +144,7 @@ void init_vram() {
  * @detail Should run first since it defines memcpy and other important stuff
  */
 __attribute__((__constructor__(101))) void libstoreinst_ctor() {
+  constructor_init_done = true;
   nvsl::cxlbuf::init_dlsyms();
   init_counters();
   init_addrs();

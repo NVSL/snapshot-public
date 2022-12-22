@@ -59,7 +59,17 @@ void *cxlbuf::mmap_start = nullptr;
 nvsl::Clock *perst_overhead_clk;
 nvsl::Counter snapshots, real_msyncs;
 
+namespace nvsl {
+  namespace cxlbuf {
+    bool init_dlsyms_done = false;
+  }
+} // namespace nvsl
+
 void cxlbuf::init_dlsyms() {
+  if (init_dlsyms_done) return;
+
+  init_dlsyms_done = true;
+
   real_memcpy = (memcpy_sign)dlsym(RTLD_NEXT, "memcpy");
   if (real_memcpy == nullptr) {
     DBGE << "dlsym failed for memcpy: %s\n" << std::string(dlerror()) << "\n";
@@ -125,6 +135,8 @@ void cxlbuf::init_dlsyms() {
 extern "C" {
 void *memcpy(void *__restrict dst, const void *__restrict src,
              size_t n) __THROW {
+  if (!real_memcpy) nvsl::cxlbuf::init_dlsyms();
+
   assert(real_memcpy != nullptr);
 
   if (startTracking and start_addr != nullptr and addr_in_range(dst)) {
@@ -136,6 +148,8 @@ void *memcpy(void *__restrict dst, const void *__restrict src,
 
 void *memmove(void *__restrict dst, const void *__restrict src,
               size_t n) __THROW {
+  if (!real_memmove) nvsl::cxlbuf::init_dlsyms();
+
   bool memmove_logged = false;
 
   assert(real_memmove != nullptr);
@@ -145,13 +159,15 @@ void *memmove(void *__restrict dst, const void *__restrict src,
     memmove_logged = true;
   }
 
-  DBGH(4) << "memmove(" << dst << ", " << src << ", " << n
-          << "), logged = " << memmove_logged << std::endl;
-
+  if (constructor_init_done) {
+    DBGH(4) << "memmove(" << dst << ", " << src << ", " << n
+            << "), logged = " << memmove_logged << std::endl;
+  }
   return real_memmove(dst, src, n);
 }
 
 void *memset(void *s, int c, size_t n) {
+  if (!real_memset) nvsl::cxlbuf::init_dlsyms();
   // fprintf(stderr, "Memset [%p:%p] %lu KiB\n", s, (void *)((char *)s + n),
   //         n / 1024);
 
@@ -166,6 +182,8 @@ void *memset(void *s, int c, size_t n) {
 
 void *mmap(void *__addr, size_t __len, int __prot, int __flags, int __fd,
            __off_t __offset) __THROW {
+  if (!real_mmap) nvsl::cxlbuf::init_dlsyms();
+
   /* Read the file name for the fd */
   const auto fd_fname = nvsl::fd_to_fname(__fd);
 
@@ -218,11 +236,15 @@ void sync(void) __THROW {
 }
 
 int msync(void *__addr, size_t __len, int __flags) {
+  if (!real_msync) nvsl::cxlbuf::init_dlsyms();
+
   DBGH(4) << "Intercepted call to " << __FUNCTION__ << "\n";
   return snapshot(__addr, __len, __flags);
 }
 
 int fsync(int __fd) __THROW {
+  if (!real_fsync) nvsl::cxlbuf::init_dlsyms();
+
   DBGH(1) << "Call to fsync intercepted: fsync(" << __fd << ")";
 
   using nvsl::cxlbuf::mapped_addr;
@@ -245,12 +267,20 @@ int fsync(int __fd) __THROW {
 
 void *mremap(void *__addr, size_t __old_len, size_t __new_len, int __flags,
              ...) __THROW {
+  if (!real_mremap) nvsl::cxlbuf::init_dlsyms();
+
   DBGE << "Unimplemented\n";
   exit(1);
   return real_mremap(__addr, __old_len, __new_len, __flags);
 }
 
+size_t previousPowerOfTwo(size_t x) {
+  return ((sizeof(x) * 8 - 1) - __builtin_clzl(x));
+}
+
 int fdatasync(int __fildes) {
+  if (!real_fdatasync) nvsl::cxlbuf::init_dlsyms();
+
   int result = 0;
   const bool addr_mapped =
       cxlbuf::mapped_addr.find(__fildes) != cxlbuf::mapped_addr.end();
@@ -409,7 +439,9 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
 
         /* Copy the logged location to the backing store if in range of
            snapshot */
-        entry_cnt++;
+        if ((entry.addr - start <= diff)) {
+          entry_cnt++;
+        }
 
         if ((entry.addr - start <= diff) and skip_entry) {
 #ifndef RELEASE
@@ -443,11 +475,7 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
           if (str_wr_allowed and entry.bytes >= 8) [[likely]] {
             size_t dst_addr_aligned = dst_addr;
 
-            auto previousPowerOfTwo = [](size_t x) -> size_t {
-              return ((sizeof(x) * 8 - 1) - __builtin_clzl(x));
-            };
-
-            size_t prev_pwr_2 = previousPowerOfTwo(entry.bytes) + 1;
+            const size_t prev_pwr_2 = previousPowerOfTwo(entry.bytes) + 1;
             size_t align_to = prev_pwr_2 > 9 ? 9 : prev_pwr_2;
             align_to =
                 (std::popcount(entry.bytes) == 1) ? align_to - 1 : align_to;
@@ -455,25 +483,42 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
             dst_addr_aligned >>= align_to;
             dst_addr_aligned <<= align_to;
 
-            size_t modulo = dst_addr & ((1 << align_to) - 1);
+            const size_t modulo = dst_addr & ((1 << align_to) - 1);
 
             dst_addr_aligned = (modulo == 0) ? dst_addr : dst_addr_aligned;
 
-            size_t new_sz = entry.bytes + (dst_addr - dst_addr_aligned);
+            const size_t new_sz_pfx_al =
+                entry.bytes + (dst_addr - dst_addr_aligned);
+            const size_t new_sz_sfx_al =
+                ((1UL << align_to) >= entry.bytes)
+                    ? (1UL << align_to)
+                    : (entry.bytes / 256 + (entry.bytes % 256 ? 1 : 0)) * 256;
+            const size_t new_sz =
+                (dst_addr == dst_addr_aligned) ? new_sz_sfx_al : new_sz_pfx_al;
 
             DBGH(4) << "Aligned " << (void *)dst_addr << " to "
                     << (void *)dst_addr_aligned << " with new size = " << new_sz
-                    << "\n";
+                    << " (prev_pwr_2=" << prev_pwr_2
+                    << ", align_to=" << align_to << ", modulo=" << modulo
+                    << ", dst_addr_aligned=" << (void *)dst_addr_aligned
+                    << ")\n";
 
 #ifdef CXLBUF_ALIGN_SNAPSHOT_WRITES
             const size_t dst_addr_arg = dst_addr_aligned;
             const size_t src_addr_arg =
-                entry.addr - (dst_addr_aligned - dst_addr);
+                dst_addr_arg - (size_t)pm_back + (size_t)start_addr;
+            //                entry.addr - (dst_addr_aligned - dst_addr);
+            DBGH(4) << "Changing entry.addr (=" << (void *)entry.addr << ") to "
+                    << (void *)entry.addr << " - (" << (void *)dst_addr_aligned
+                    << " - " << (void *)dst_addr
+                    << ") = " << (void *)src_addr_arg << "\n";
+
 #else
             const size_t dst_addr_arg = dst_addr;
             const size_t src_addr_arg = entry.addr;
 #endif
-
+            DBGH(4) << "streaming_wr(" << (void *)dst_addr_arg << ", "
+                    << (void *)src_addr_arg << ", " << new_sz << ")\n";
             pmemops->streaming_wr((void *)dst_addr_arg, (void *)src_addr_arg,
                                   new_sz);
 #ifndef RELEASE
@@ -518,7 +563,10 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
       if (applied_cnt == entry_cnt) {
         tls_log.set_state(cxlbuf::Log::State::EMPTY);
       } else {
-        DBGW << "Not resetting log state on snapshot()\n";
+        DBGE << "applied_cnt " << applied_cnt << " entry_cnt " << entry_cnt
+             << "\n";
+        DBGE << "Not resetting log state on snapshot()\n";
+        exit(1);
       }
       tls_log.clear();
     }
@@ -544,21 +592,21 @@ __attribute__((unused)) int snapshot(void *addr, size_t bytes, int flags) {
   return 0;
 }
 
-  int munmap(void *__addr, size_t __len) __THROW {
-    DBGH(4) << "mumap intercepted\n";
-    for (auto &range : cxlbuf::mapped_addr) {
-      if (__addr >= (void *)range.second.range.start &&
-          __addr < (void *)range.second.range.end) {
-        if (__addr != (void *)range.second.range.start) {
-          DBGE << "Unmapping part of address range not supported" << std::endl;
-          exit(1);
-        } else {
-          cxlbuf::mapped_addr.erase(cxlbuf::mapped_addr.find(range.first));
-          break;
-        }
+int munmap(void *__addr, size_t __len) __THROW {
+  DBGH(4) << "mumap intercepted\n";
+  for (auto &range : cxlbuf::mapped_addr) {
+    if (__addr >= (void *)range.second.range.start &&
+        __addr < (void *)range.second.range.end) {
+      if (__addr != (void *)range.second.range.start) {
+        DBGE << "Unmapping part of address range not supported" << std::endl;
+        exit(1);
+      } else {
+        cxlbuf::mapped_addr.erase(cxlbuf::mapped_addr.find(range.first));
+        break;
       }
     }
-
-    return real_munmap(__addr, __len);
   }
+
+  return real_munmap(__addr, __len);
+}
 }

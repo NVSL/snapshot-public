@@ -94,7 +94,8 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     DBGH(4) << "Entry size = " << entry_sz << " bytes."
             << " address = " << (void *)start
             << " last_flush_offset = " << last_flush_offset
-            << " log_area->log_offset = " << log_area->log_offset << std::endl;
+            << " log_area->log_offset = " << log_area->log_offset
+            << " content bytes = " << bytes << std::endl;
 
     if (bytes == 8) {
       DBGH(4) << "Old value = " << (void *)(*(uint64_t *)start) << std::endl;

@@ -102,9 +102,10 @@ execute() {
 
     clean
 
-    CXL_MODE_ENABLED=1 "${NUMA_CTL_SNAPSHOT}" "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+    CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
                        ycsb "${YCSB_LOC}${wrkld}.load" \
                        "${YCSB_LOC}${wrkld}.run"  2>&1 \
+        | tee -a "$LOG_F" \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     if [ "$EXP" = "MSS" ]; then
