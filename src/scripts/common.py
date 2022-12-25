@@ -232,8 +232,38 @@ class Fig(object):
         self.ax.set_ylabel(ylabel, fontsize=fontsize, fontweight='bold', **kwargs)
 
         return self
+    
+    def save_legend(self, filename, usepdfbound=True):
+        if c_disable_fig_save:
+            return
 
-    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white', label_move_thresh=0.005, label_off_frac=0.1, rotation=0, ha='center', va='bottom', suffix='x', label_x_off=0):
+        save_dir = c_save_loc + '/' + c_save_prefix
+        dest = save_dir + '/' + filename + '.png'
+
+        if os.path.exists(save_dir):
+            if not os.path.isdir(c_save_loc):
+                printmd('`' + c_save_loc + '` : <span style=\'color:red\'>is not a directory, FATAL</span>')
+                return 
+        else:
+            os.mkdir(save_dir)
+
+        fig = self.ax.get_figure()
+        fig.canvas.draw()
+        bbox  = self.ax.legend().get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(dest, dpi=400, bbox_inches=bbox)
+        printmd('Plot saved as `' + dest + '`')
+
+        fig.savefig(dest[:-4] + '.pdf', dpi=400, bbox_inches=bbox, pad_inches=0)
+        printmd('Plot saved as `' + dest + '`')
+
+        if usepdfbound:
+            cmd = 'pdfcrop %s.pdf %s.pdf' % (dest[:-4], dest[:-4])
+            printmd('Using pdfcrop on `' + dest + '` with command `' + cmd + '`') 
+            os.system(cmd)
+
+
+
+    def add_bar_labels(self, mask, fontsize=None, precision=1, over_fig=True, facecolor='white', alpha=1, edgecolor='white', label_move_thresh=0.005, label_off_frac=0.1, rotation=0, ha='center', va='bottom', suffix='x', label_x_off=0, label_y_off=0):
         rects = self.ax.patches
         mask_full = mask
         
@@ -280,12 +310,13 @@ class Fig(object):
                 text_x_off = rect.get_width()/4
             
             tx = self.ax.text(
-                label_x_off + rect.get_x() + rect.get_width() / 2, label_pos, f"{label}{suffix}",
+                label_x_off + rect.get_x() + rect.get_width() / 2, label_y_off + label_pos, f"{label}{suffix}",
                 fontsize=label_fontsize,
                 bbox=dict(facecolor=facecolor, alpha=alpha, edgecolor=edgecolor),
                 ha=ha,
                 va=va,
-                rotation=rotation
+                rotation=rotation,
+                zorder=20,
             )
 
         return self
