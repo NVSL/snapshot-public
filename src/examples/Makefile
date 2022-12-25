@@ -10,7 +10,7 @@ DIR      := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 LIBS_DIR := $(shell readlink -f $(DIR)../../lib)
 EXTRA_CXXFLAGS += -fno-omit-frame-pointer
 EXTRA_LDFLAGS +=-L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed
-EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer
+EXTRA_LINKFLAGS +=-ldsaemu -pthread -lpmbuffer -lcxlfs
 
 SUBDIRS := map_pmdk simplekv_cxlbuf simplekv_pmdk simplekv_famus		\
 	linkedlist_pmdk linkedlist_tx linkedlist_tx_cxlfs microbenchmarks gpu-microbenchmarks	\
@@ -32,7 +32,7 @@ dummy: dummy.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)
 
 single_write:
-	../storeinst-pass/dclang++ -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed -std=c++20 -ldl -lstoreinst $@.cc -o $@
+	../storeinst-pass/dclang++ -L$(LIBS_DIR) -Wl,-R$(LIBS_DIR) -Wl,--no-as-needed -std=c++20 -ldl -lstoreinst -lcxlfs $@.cc -o $@
 
 cat-demo: cat-demo.o
 	$(PUDDLES_CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LINKFLAGS)

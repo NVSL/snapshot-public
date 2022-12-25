@@ -15,7 +15,8 @@ FS_POOL="/mnt/pmem0p3/simplekv"
 V="${V:-0}"
 LOG_F=`mktemp`
 
-NUMA_CTL=""
+NUMA_CTL="numactl -N0 --"
+NUMA_CTL_SNAPSHOT=""
 LD_PRELOAD=""
 EXP="$1"
 
@@ -43,7 +44,7 @@ if [ "$EXP" = "MSS" ]; then
     export REMOTE_NODE=0
 else
 #    export CXLBUF_LOG_LOC="/mnt/pmem0/cxlbuf_logs/"
-    NUMA_CTL="numactl -N0 --"
+    NUMA_CTL_SNAPSHOT="numactl -N0 --"
 fi
 
 
@@ -101,9 +102,10 @@ execute() {
 
     clean
 
-    CXL_MODE_ENABLED=1 "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
+    CXL_MODE_ENABLED=1 ${NUMA_CTL_SNAPSHOT} "${SIMPLEKV_ROOT}/${SIMPLEKV_CXLBUF}.inst" "${PMDK_POOL}" \
                        ycsb "${YCSB_LOC}${wrkld}.load" \
                        "${YCSB_LOC}${wrkld}.run"  2>&1 \
+        | tee -a "$LOG_F" \
         | grep 'Total ns' | grep -Eo '[0-9]+' | tr -d '\n'
 
     if [ "$EXP" = "MSS" ]; then

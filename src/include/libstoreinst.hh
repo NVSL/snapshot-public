@@ -42,6 +42,7 @@ extern size_t current_log_off, current_log_cnt;
 extern bool startTracking;
 extern bool storeInstEnabled;
 extern bool cxlModeEnabled;
+extern bool constructor_init_done;
 extern nvsl::PMemOps *pmemops;
 }
 

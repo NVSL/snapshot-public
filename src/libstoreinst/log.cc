@@ -25,12 +25,17 @@
     "Incompatible flags: LOG_FORMAT_VOLATILE and LOG_FORMAT_NON_VOLATILE enabled"
 #endif
 
-nvsl::Counter *nvsl::cxlbuf::skip_check_count,
-    *nvsl::cxlbuf::logged_check_count;
-nvsl::StatsFreq<> *nvsl::cxlbuf::tx_log_count_dist;
+using namespace nvsl;
+
+Counter *cxlbuf::skip_check_count, *cxlbuf::logged_check_count,
+    *cxlbuf::dup_log_entries, *cxlbuf::back_to_back_dup_log,
+    *cxlbuf::total_log_entries, *cxlbuf::total_pers_log_entries,
+    *cxlbuf::mergeable_entries;
+StatsFreq<> *cxlbuf::tx_log_count_dist;
+StatsScalar *cxlbuf::total_bytes_wr, *cxlbuf::total_bytes_wr_strm,
+    *nvsl::cxlbuf::total_bytes_flushed;
 
 extern nvsl::PMemOps *pmemops;
-using namespace nvsl;
 
 void cxlbuf::Log::log_range(void *start, size_t bytes) {
   auto cxlModeEnabled_reg = cxlModeEnabled;
@@ -51,15 +56,26 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     perst_overhead_clk->tick();
 #endif // CXLBUF_TESTING_GOODIES
 
-    // #ifndef NDEBUG
+#ifndef NDEBUG
     NVSL_ASSERT((bytes < (1 << 22)), "Log request to location " +
                                          S((void *)start) + " for " + S(bytes) +
                                          " bytes is invalid");
-    // #endif
+#endif
+
+#ifndef RELEASE
+    ++(*total_log_entries);
+#endif
 
 #ifdef LOG_FORMAT_VOLATILE
     /* Update the volatile address list */
     this->entries.emplace_back((size_t)start, bytes);
+    if ((this->last_log.addr == this->entries.back().addr) and
+        (this->last_log.bytes == this->entries.back().bytes)) {
+      ++(*back_to_back_dup_log);
+      return;
+    }
+
+    this->last_log = this->entries.back();
 #endif
 
     /* Write to the persistent log and flush and fence it */
@@ -78,7 +94,8 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     DBGH(4) << "Entry size = " << entry_sz << " bytes."
             << " address = " << (void *)start
             << " last_flush_offset = " << last_flush_offset
-            << " log_area->log_offset = " << log_area->log_offset << std::endl;
+            << " log_area->log_offset = " << log_area->log_offset
+            << " content bytes = " << bytes << std::endl;
 
     if (bytes == 8) {
       DBGH(4) << "Old value = " << (void *)(*(uint64_t *)start) << std::endl;
@@ -117,7 +134,7 @@ void cxlbuf::Log::log_range(void *start, size_t bytes) {
     }
 #endif
 
-    NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
+    // NVSL_ASSERT(log_area->log_offset < BUF_SIZE, "");
 
 #ifdef CXLBUF_TESTING_GOODIES
     perst_overhead_clk->tock();
