@@ -1,4 +1,0 @@
-operation,pmdk,snapshot,msync,msync huge pages,msync data journal
-insert,3.703865,3.4673,9.8302,1608.0007,91.9899
-delete,4.642941,4.8922,21.1721,3294.4182,179.2206
-read,0.969076,.2342,.3801,.3580,.2636
